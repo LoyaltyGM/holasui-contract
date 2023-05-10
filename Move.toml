@@ -1,10 +1,10 @@
 [package]
 name = "holasui"
 version = "0.0.1"
+published-at = "0x3412f5d7819fddb9d504a422177e3cc62c029f08002a0d51c0f7cfd93cfdfbcc"
 
 [dependencies]
 Sui = { local = "../sui/crates/sui-framework/packages/sui-framework" }
 
 [addresses]
-holasui =  "0x0"
-sui =  "0000000000000000000000000000000000000000000000000000000000000002"
+holasui = "0x3412f5d7819fddb9d504a422177e3cc62c029f08002a0d51c0f7cfd93cfdfbcc"
