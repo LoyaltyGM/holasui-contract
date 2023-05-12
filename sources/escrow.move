@@ -223,7 +223,8 @@ module holasui::escrow {
         //     if (object_bag::contains<ID>(&offer.object_bag, *vector::borrow(&offer.creator_objects, i))) {
         //         let obj = object_bag::remove(&mut offer.object_bag, *vector::borrow(&offer.creator_objects, i));
         //         public_transfer(obj, to);
-        //     }
+        //     };
+        //     i = i + 1;
         // };
 
         if (object_bag::contains<String>(&offer.object_bag, key_creator_coin())) {
@@ -238,7 +239,8 @@ module holasui::escrow {
         //     if (object_bag::contains<ID>(&offer.object_bag, *vector::borrow(&offer.recipient_objects, i))) {
         //         object_bag::remove(&mut offer.object_bag, *vector::borrow(&offer.recipient_objects, i));
         //         public_transfer(obj, to);
-        //     }
+        //     };
+        //     i = i + 1;
         // };
 
         if (object_bag::contains<String>(&offer.object_bag, key_recipient_coin())) {
