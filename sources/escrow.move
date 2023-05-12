@@ -39,11 +39,11 @@ module holasui::escrow {
     // ======== Creator of Offer functions ========
 
     public fun create(
-        creator_object_offers: vector<ID>,
-        creator_coin_offer_amount: u64,
+        creator_objects: vector<ID>,
+        creator_coin_amount: u64,
         recipient: address,
-        recipient_object_offers: vector<ID>,
-        recipient_coin_offer_amount: u64,
+        recipient_objects: vector<ID>,
+        recipient_coin_amount: u64,
         ctx: &mut TxContext
     ): EscrowOffer {
         let id = object::new(ctx);
@@ -52,11 +52,11 @@ module holasui::escrow {
             id,
             active: false,
             creator: sender(ctx),
-            creator_objects: creator_object_offers,
-            creator_coin_amount: creator_coin_offer_amount,
+            creator_objects,
+            creator_coin_amount,
             recipient,
-            recipient_objects: recipient_object_offers,
-            recipient_coin_amount: recipient_coin_offer_amount,
+            recipient_objects,
+            recipient_coin_amount,
         }
     }
 
@@ -160,8 +160,11 @@ module holasui::escrow {
         check_creator_offer(offer);
         check_recipient_offer(offer);
 
-        transfer_creator_offers(offer, offer.recipient);
-        transfer_recipient_offers(offer, offer.creator);
+        let recipient = offer.recipient;
+        transfer_creator_offers(offer, recipient);
+
+        let creator = offer.creator;
+        transfer_recipient_offers(offer, creator);
     }
 
 
@@ -203,13 +206,13 @@ module holasui::escrow {
     }
 
     fun transfer_creator_offers(offer: &mut EscrowOffer, to: address) {
-        let i = 0;
-        while (i < vector::length(&offer.creator_objects)) {
-            if (dof::exists_<ID>(&offer.id, *vector::borrow(&offer.creator_objects, i))) {
-                let obj = dof::remove(&mut offer.id, *vector::borrow(&offer.creator_objects, i));
-                public_transfer(obj, to);
-            }
-        };
+        // let i = 0;
+        // while (i < vector::length(&offer.creator_objects)) {
+        //     if (dof::exists_<ID>(&offer.id, *vector::borrow(&offer.creator_objects, i))) {
+        //         let obj = dof::remove(&mut offer.id, *vector::borrow(&offer.creator_objects, i));
+        //         public_transfer(obj, to);
+        //     }
+        // };
 
         if (dof::exists_<String>(&offer.id, key_creator_coin())) {
             let coin = dof::remove<String, Coin<SUI>>(&mut offer.id, key_creator_coin());
@@ -218,13 +221,13 @@ module holasui::escrow {
     }
 
     fun transfer_recipient_offers(offer: &mut EscrowOffer, to: address) {
-        let i = 0;
-        while (i < vector::length(&offer.recipient_objects)) {
-            if (dof::exists_<ID>(&offer.id, *vector::borrow(&offer.recipient_objects, i))) {
-                dof::remove(&mut offer.id, *vector::borrow(&offer.recipient_objects, i));
-                public_transfer(obj, to);
-            }
-        };
+        // let i = 0;
+        // while (i < vector::length(&offer.recipient_objects)) {
+        //     if (dof::exists_<ID>(&offer.id, *vector::borrow(&offer.recipient_objects, i))) {
+        //         dof::remove(&mut offer.id, *vector::borrow(&offer.recipient_objects, i));
+        //         public_transfer(obj, to);
+        //     }
+        // };
 
         if (dof::exists_<String>(&offer.id, key_recipient_coin())) {
             let coin = dof::remove<String, Coin<SUI>>(&mut offer.id, key_recipient_coin());
