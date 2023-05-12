@@ -5,7 +5,6 @@ module holasui::staking {
     use sui::clock::{Self, Clock};
     use sui::coin::{Self, Coin};
     use sui::display;
-    use sui::dynamic_field as df;
     use sui::dynamic_object_field as dof;
     use sui::event::emit;
     use sui::object::{Self, UID, ID};
@@ -19,8 +18,6 @@ module holasui::staking {
 
     // ======== Constants =========
     // initial values
-    const VERSION: u64 = 3;
-
     const FEE_FOR_STAKE: u64 = 1000000000;
     const FEE_FOR_UNSTAKE: u64 = 3000000000;
     const POINTS_PER_MINUTE: u64 = 1;
@@ -32,8 +29,6 @@ module holasui::staking {
 
     const EInsufficientPay: u64 = 0;
     const EZeroBalance: u64 = 1;
-    const EWrongVersion: u64 = 2;
-    const ENotUpgrade: u64 = 3;
 
     // ======== Types =========
 
@@ -158,7 +153,6 @@ module holasui::staking {
             staked: 0,
         };
         dof::add<String, Table<address, u64>>(&mut pool.id, points_key(), table::new<address, u64>(ctx));
-        df::add(&mut pool.id, version_key(), VERSION);
 
         // Add poolId to list of pools
         table::add(borrow_hub_pools_mut(hub), object::id(&pool), true);
@@ -178,22 +172,6 @@ module holasui::staking {
         pool.points_per_minute = points;
     }
 
-    entry fun migrate_hub(_: &AdminCap, hub: &mut StakingHub) {
-        if (df::exists_<String>(&hub.id, version_key())) {
-            assert!(*df::borrow<String, u64>(&hub.id, version_key()) < VERSION, ENotUpgrade);
-            df::remove<String, u64>(&mut hub.id, version_key());
-        };
-        df::add<String, u64>(&mut hub.id, version_key(), VERSION);
-    }
-
-    entry fun migrate_pool<T>(_: &AdminCap, pool: &mut StakingPool<T>) {
-        if (df::exists_<String>(&pool.id, version_key())) {
-            assert!(*df::borrow<String, u64>(&pool.id, version_key()) < VERSION, ENotUpgrade);
-            df::remove<String, u64>(&mut pool.id, version_key());
-        };
-        df::add<String, u64>(&mut pool.id, version_key(), VERSION);
-    }
-
     // ======== User functions =========
 
     public entry fun stake<T: key + store>(
@@ -204,9 +182,6 @@ module holasui::staking {
         clock: &Clock,
         ctx: &mut TxContext
     ) {
-        check_hub_version(hub);
-        check_pool_version(pool);
-
         handle_payment(hub, coin, pool.fee_for_stake, ctx);
 
         let nft_id: ID = object::id(&nft);
@@ -242,9 +217,6 @@ module holasui::staking {
         clock: &Clock,
         ctx: &mut TxContext
     ) {
-        check_hub_version(hub);
-        check_pool_version(pool);
-
         handle_payment(hub, coin, pool.fee_for_unstake, ctx);
 
         let StakingTicket { id, nft_id, start_time, name: _, url: _, } = ticket;
@@ -277,10 +249,6 @@ module holasui::staking {
         clock: &Clock,
         ctx: &mut TxContext
     ) {
-        check_hub_version(hub);
-        check_pool_version(pool);
-
-
         let points = ((clock::timestamp_ms(clock) - ticket.start_time) / 60000) * pool.points_per_minute;
 
         if (points > 0) {
@@ -327,10 +295,6 @@ module holasui::staking {
         utf8(b"pools")
     }
 
-    public fun version_key(): String {
-        utf8(b"version")
-    }
-
     // ======== Utility functions =========
 
     fun handle_payment(hub: &mut StakingHub, coin: Coin<SUI>, price: u64, ctx: &mut TxContext) {
@@ -368,13 +332,5 @@ module holasui::staking {
 
     fun borrow_hub_pools_mut(hub: &mut StakingHub): &mut Table<ID, bool> {
         dof::borrow_mut(&mut hub.id, pools_key())
-    }
-
-    fun check_hub_version(hub: &StakingHub) {
-        assert!(*df::borrow<String, u64>(&hub.id, version_key()) == VERSION, EWrongVersion);
-    }
-
-    fun check_pool_version<T>(pool: &StakingPool<T>) {
-        assert!(*df::borrow<String, u64>(&pool.id, version_key()) == VERSION, EWrongVersion);
     }
 }
