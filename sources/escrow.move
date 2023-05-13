@@ -8,6 +8,7 @@ module holasui::escrow {
     use sui::sui::SUI;
     use sui::transfer::{share_object, public_transfer};
     use sui::tx_context::{TxContext, sender};
+    use sui::package;
 
     // ======== Errors =========
     const EWrongOwner: u64 = 0;
@@ -18,9 +19,10 @@ module holasui::escrow {
     const EInactiveOffer: u64 = 5;
 
     // ======== Types =========
+    struct ESCROW has drop {}
 
     /// An object held in escrow
-    struct EscrowOffer has key, store {
+    struct EscrowOffer<phantom T> has key, store {
         id: UID,
         active: bool,
         object_bag: ObjectBag,
@@ -37,16 +39,22 @@ module holasui::escrow {
 
     // ======== Functions =========
 
+    fun init(otw: ESCROW, ctx: &mut TxContext) {
+        let publisher = package::claim(otw, ctx);
+
+        public_transfer(publisher, sender(ctx));
+    }
+
     // ======== Creator of Offer functions ========
 
-    public fun create(
+    public fun create<T>(
         creator_objects: vector<ID>,
         creator_coin_amount: u64,
         recipient: address,
         recipient_objects: vector<ID>,
         recipient_coin_amount: u64,
         ctx: &mut TxContext
-    ): EscrowOffer {
+    ): EscrowOffer<T> {
         let id = object::new(ctx);
 
         EscrowOffer {
@@ -63,10 +71,10 @@ module holasui::escrow {
     }
 
     public fun update_creator_objects<T: key + store>(
-        offer: EscrowOffer,
+        offer: EscrowOffer<T>,
         item: T,
         ctx: &mut TxContext
-    ): EscrowOffer {
+    ): EscrowOffer<T> {
         assert!(sender(ctx) == offer.creator, EWrongOwner);
 
         assert!(vector::contains(&offer.creator_objects, &object::id(&item)), EWrongObject);
@@ -76,11 +84,11 @@ module holasui::escrow {
         offer
     }
 
-    public fun update_creator_coin(
-        offer: EscrowOffer,
+    public fun update_creator_coin<T>(
+        offer: EscrowOffer<T>,
         coin: Coin<SUI>,
         ctx: &mut TxContext
-    ): EscrowOffer {
+    ): EscrowOffer<T> {
         assert!(sender(ctx) == offer.creator, EWrongOwner);
 
         assert!(coin::value(&coin) == offer.creator_coin_amount, EWrongCoinAmount);
@@ -90,8 +98,8 @@ module holasui::escrow {
         offer
     }
 
-    public fun share_offer(
-        offer: EscrowOffer,
+    public fun share_offer<T>(
+        offer: EscrowOffer<T>,
         ctx: &mut TxContext
     ) {
         assert!(sender(ctx) == offer.creator, EWrongOwner);
@@ -103,8 +111,8 @@ module holasui::escrow {
         share_object(offer);
     }
 
-    public fun cancel_creator_offer(
-        offer: &mut EscrowOffer,
+    public fun cancel_creator_offer<T: key + store>(
+        offer: &mut EscrowOffer<T>,
         ctx: &mut TxContext
     ) {
         assert!(offer.active, EInactiveOffer);
@@ -118,7 +126,7 @@ module holasui::escrow {
     // ======== Recipient of Offer functions ========
 
     public fun update_recipient_objects<T: key + store>(
-        offer: &mut EscrowOffer,
+        offer: &mut EscrowOffer<T>,
         item: T,
         ctx: &mut TxContext
     ) {
@@ -130,8 +138,8 @@ module holasui::escrow {
         object_bag::add<ID, T>(&mut offer.object_bag, object::id(&item), item);
     }
 
-    public fun update_recipient_coin(
-        offer: &mut EscrowOffer,
+    public fun update_recipient_coin<T>(
+        offer: &mut EscrowOffer<T>,
         coin: Coin<SUI>,
         ctx: &mut TxContext
     ) {
@@ -143,8 +151,8 @@ module holasui::escrow {
         object_bag::add<String, Coin<SUI>>(&mut offer.object_bag, key_recipient_coin(), coin);
     }
 
-    public fun cancel_recipient_offer(
-        offer: &mut EscrowOffer,
+    public fun cancel_recipient_offer<T: key + store>(
+        offer: &mut EscrowOffer<T>,
         ctx: &mut TxContext
     ) {
         assert!(sender(ctx) == offer.recipient, EWrongRecipient);
@@ -152,8 +160,8 @@ module holasui::escrow {
         transfer_recipient_offers(offer, sender(ctx));
     }
 
-    public fun exchange(
-        offer: &mut EscrowOffer,
+    public fun exchange<T: key + store>(
+        offer: &mut EscrowOffer<T>,
         ctx: &mut TxContext
     ) {
         assert!(offer.active, EInactiveOffer);
@@ -183,7 +191,7 @@ module holasui::escrow {
 
     // ======== Utility functions =========
 
-    fun check_creator_offer(offer: &mut EscrowOffer) {
+    fun check_creator_offer<T>(offer: &mut EscrowOffer<T>) {
         let i = 0;
         while (i < vector::length(&offer.creator_objects)) {
             assert!(
@@ -200,7 +208,7 @@ module holasui::escrow {
         );
     }
 
-    fun check_recipient_offer(offer: &mut EscrowOffer) {
+    fun check_recipient_offer<T>(offer: &mut EscrowOffer<T>) {
         let i = 0;
         while (i < vector::length(&offer.recipient_objects)) {
             assert!(
@@ -217,15 +225,15 @@ module holasui::escrow {
         );
     }
 
-    fun transfer_creator_offers(offer: &mut EscrowOffer, to: address) {
-        // let i = 0;
-        // while (i < vector::length(&offer.creator_objects)) {
-        //     if (object_bag::contains<ID>(&offer.object_bag, *vector::borrow(&offer.creator_objects, i))) {
-        //         let obj = object_bag::remove(&mut offer.object_bag, *vector::borrow(&offer.creator_objects, i));
-        //         public_transfer(obj, to);
-        //     };
-        //     i = i + 1;
-        // };
+    fun transfer_creator_offers<T: key + store>(offer: &mut EscrowOffer<T>, to: address) {
+        let i = 0;
+        while (i < vector::length(&offer.creator_objects)) {
+            if (object_bag::contains<ID>(&offer.object_bag, *vector::borrow(&offer.creator_objects, i))) {
+                let obj = object_bag::remove<ID, T>(&mut offer.object_bag, *vector::borrow(&offer.creator_objects, i));
+                public_transfer(obj, to);
+            };
+            i = i + 1;
+        };
 
         if (object_bag::contains<String>(&offer.object_bag, key_creator_coin())) {
             let coin = object_bag::remove<String, Coin<SUI>>(&mut offer.object_bag, key_creator_coin());
@@ -233,15 +241,18 @@ module holasui::escrow {
         };
     }
 
-    fun transfer_recipient_offers(offer: &mut EscrowOffer, to: address) {
-        // let i = 0;
-        // while (i < vector::length(&offer.recipient_objects)) {
-        //     if (object_bag::contains<ID>(&offer.object_bag, *vector::borrow(&offer.recipient_objects, i))) {
-        //         object_bag::remove(&mut offer.object_bag, *vector::borrow(&offer.recipient_objects, i));
-        //         public_transfer(obj, to);
-        //     };
-        //     i = i + 1;
-        // };
+    fun transfer_recipient_offers<T: key + store>(offer: &mut EscrowOffer<T>, to: address) {
+        let i = 0;
+        while (i < vector::length(&offer.recipient_objects)) {
+            if (object_bag::contains<ID>(&offer.object_bag, *vector::borrow(&offer.recipient_objects, i))) {
+                let obj = object_bag::remove<ID, T>(
+                    &mut offer.object_bag,
+                    *vector::borrow(&offer.recipient_objects, i)
+                );
+                public_transfer(obj, to);
+            };
+            i = i + 1;
+        };
 
         if (object_bag::contains<String>(&offer.object_bag, key_recipient_coin())) {
             let coin = object_bag::remove<String, Coin<SUI>>(&mut offer.object_bag, key_recipient_coin());
