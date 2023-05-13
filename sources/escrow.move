@@ -5,10 +5,10 @@ module holasui::escrow {
     use sui::coin::{Self, Coin};
     use sui::object::{Self, ID, UID};
     use sui::object_bag::{Self, ObjectBag};
+    use sui::package;
     use sui::sui::SUI;
     use sui::transfer::{share_object, public_transfer};
     use sui::tx_context::{TxContext, sender};
-    use sui::package;
 
     // ======== Errors =========
     const EWrongOwner: u64 = 0;
@@ -200,12 +200,14 @@ module holasui::escrow {
             );
         };
 
-        assert!(
-            coin::value(
-                object_bag::borrow<String, Coin<SUI>>(&offer.object_bag, key_creator_coin())
-            ) == offer.creator_coin_amount,
-            EInvalidOffer
-        );
+        if (offer.creator_coin_amount > 0) {
+            assert!(
+                coin::value(
+                    object_bag::borrow<String, Coin<SUI>>(&offer.object_bag, key_creator_coin())
+                ) == offer.creator_coin_amount,
+                EInvalidOffer
+            );
+        }
     }
 
     fun check_recipient_offer<T>(offer: &mut EscrowOffer<T>) {
@@ -217,12 +219,14 @@ module holasui::escrow {
             );
         };
 
-        assert!(
-            coin::value(
-                object_bag::borrow<String, Coin<SUI>>(&offer.object_bag, key_recipient_coin())
-            ) == offer.recipient_coin_amount,
-            EInvalidOffer
-        );
+        if (offer.recipient_coin_amount > 0) {
+            assert!(
+                coin::value(
+                    object_bag::borrow<String, Coin<SUI>>(&offer.object_bag, key_recipient_coin())
+                ) == offer.recipient_coin_amount,
+                EInvalidOffer
+            );
+        }
     }
 
     fun transfer_creator_offers<T: key + store>(offer: &mut EscrowOffer<T>, to: address) {
