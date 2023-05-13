@@ -2,10 +2,12 @@ module holasui::escrow {
     use std::string::{utf8, String};
     use std::vector;
 
+    use sui::balance::{Self, Balance};
     use sui::coin::{Self, Coin};
     use sui::object::{Self, ID, UID};
     use sui::object_bag::{Self, ObjectBag};
     use sui::package;
+    use sui::pay;
     use sui::sui::SUI;
     use sui::transfer::{share_object, public_transfer};
     use sui::tx_context::{TxContext, sender};
@@ -17,12 +19,19 @@ module holasui::escrow {
     const EWrongCoinAmount: u64 = 3;
     const EInvalidOffer: u64 = 4;
     const EInactiveOffer: u64 = 5;
+    const EInsufficientPay: u64 = 6;
 
     // ======== Types =========
     struct ESCROW has drop {}
 
+    struct EscrowHub has key {
+        id: UID,
+        fee: u64,
+        balance: Balance<SUI>
+    }
+
     /// An object held in escrow
-    struct EscrowOffer<phantom T> has key, store {
+    struct EscrowOffer<phantom T> has key {
         id: UID,
         active: bool,
         object_bag: ObjectBag,
@@ -43,6 +52,11 @@ module holasui::escrow {
         let publisher = package::claim(otw, ctx);
 
         public_transfer(publisher, sender(ctx));
+        share_object(EscrowHub {
+            id: object::new(ctx),
+            fee: 400000000,
+            balance: balance::zero()
+        })
     }
 
     // ======== Creator of Offer functions ========
@@ -162,10 +176,14 @@ module holasui::escrow {
 
     public fun exchange<T: key + store>(
         offer: &mut EscrowOffer<T>,
+        hub: &mut EscrowHub,
+        coin: Coin<SUI>,
         ctx: &mut TxContext
     ) {
         assert!(offer.active, EInactiveOffer);
         assert!(sender(ctx) == offer.recipient, EWrongRecipient);
+
+        handle_payment(hub, coin, ctx);
 
         check_creator_offer(offer);
         check_recipient_offer(offer);
@@ -190,6 +208,15 @@ module holasui::escrow {
 
 
     // ======== Utility functions =========
+
+    fun handle_payment(hub: &mut EscrowHub, coin: Coin<SUI>, ctx: &mut TxContext) {
+        assert!(coin::value(&coin) >= hub.fee, EInsufficientPay);
+
+        let payment = coin::split(&mut coin, hub.fee, ctx);
+
+        coin::put(&mut hub.balance, payment);
+        pay::keep(coin, ctx);
+    }
 
     fun check_creator_offer<T>(offer: &mut EscrowOffer<T>) {
         let i = 0;
