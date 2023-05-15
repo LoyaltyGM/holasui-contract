@@ -61,7 +61,7 @@ module holasui::escrow {
 
     // ======== Creator of Offer functions ========
 
-    public fun create<T>(
+    fun create<T>(
         creator_objects: vector<ID>,
         creator_coin_amount: u64,
         recipient: address,
@@ -84,7 +84,7 @@ module holasui::escrow {
         }
     }
 
-    public fun update_creator_objects<T: key + store>(
+    fun update_creator_objects<T: key + store>(
         offer: EscrowOffer<T>,
         item: T,
         ctx: &mut TxContext
@@ -98,7 +98,7 @@ module holasui::escrow {
         offer
     }
 
-    public fun update_creator_coin<T>(
+    fun update_creator_coin<T>(
         offer: EscrowOffer<T>,
         coin: Coin<SUI>,
         ctx: &mut TxContext
@@ -112,7 +112,7 @@ module holasui::escrow {
         offer
     }
 
-    public fun share_offer<T>(
+    fun share_offer<T>(
         offer: EscrowOffer<T>,
         ctx: &mut TxContext
     ) {
@@ -125,7 +125,7 @@ module holasui::escrow {
         share_object(offer);
     }
 
-    public fun cancel_creator_offer<T: key + store>(
+    fun cancel_creator_offer<T: key + store>(
         offer: &mut EscrowOffer<T>,
         ctx: &mut TxContext
     ) {
@@ -139,7 +139,7 @@ module holasui::escrow {
 
     // ======== Recipient of Offer functions ========
 
-    public fun update_recipient_objects<T: key + store>(
+    fun update_recipient_objects<T: key + store>(
         offer: &mut EscrowOffer<T>,
         item: T,
         ctx: &mut TxContext
@@ -152,7 +152,7 @@ module holasui::escrow {
         object_bag::add<ID, T>(&mut offer.object_bag, object::id(&item), item);
     }
 
-    public fun update_recipient_coin<T>(
+    fun update_recipient_coin<T>(
         offer: &mut EscrowOffer<T>,
         coin: Coin<SUI>,
         ctx: &mut TxContext
@@ -165,7 +165,7 @@ module holasui::escrow {
         object_bag::add<String, Coin<SUI>>(&mut offer.object_bag, key_recipient_coin(), coin);
     }
 
-    public fun cancel_recipient_offer<T: key + store>(
+    fun cancel_recipient_offer<T: key + store>(
         offer: &mut EscrowOffer<T>,
         ctx: &mut TxContext
     ) {
@@ -174,7 +174,7 @@ module holasui::escrow {
         transfer_recipient_offers(offer, sender(ctx));
     }
 
-    public fun exchange<T: key + store>(
+    fun exchange<T: key + store>(
         offer: &mut EscrowOffer<T>,
         hub: &mut EscrowHub,
         coin: Coin<SUI>,
