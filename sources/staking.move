@@ -126,7 +126,7 @@ module holasui::staking {
     }
 
     struct RewardClaimed has copy, drop {
-        reward_id: ID,
+        reward_info_id: ID,
     }
     // ======== Functions =========
 
@@ -374,10 +374,13 @@ module holasui::staking {
 
     entry fun claim_reward<T>(
         pool: &mut StakingPool<T>,
-        reward_id: ID,
+        reward_info_id: ID,
         ctx: &mut TxContext
     ) {
-        let reward_info = table::borrow_mut(borrow_pool_rewards_mut(pool), reward_id);
+        // ======== Reward =========
+
+        let reward_info = table::borrow_mut(borrow_pool_rewards_mut(pool), reward_info_id);
+        let reward_points = reward_info.points;
         let is_check_supply = option::is_some(&reward_info.supply);
         let is_check_per_address = option::is_some(&reward_info.per_address);
 
@@ -401,11 +404,15 @@ module holasui::staking {
             name: reward_info.name,
             description: reward_info.description,
             url: reward_info.url,
-            reward_info_id: reward_id,
+            reward_info_id,
         };
 
+        // ======== Points =========
+
+        sub_points(borrow_pool_points_mut(pool), sender(ctx), reward_points);
+
         emit(RewardClaimed {
-            reward_id: object::id(reward_info),
+            reward_info_id,
         });
 
         transfer(reward, sender(ctx));
