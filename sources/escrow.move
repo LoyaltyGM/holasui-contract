@@ -5,6 +5,7 @@ module holasui::escrow {
     use sui::balance::{Self, Balance};
     use sui::coin::{Self, Coin};
     use sui::dynamic_object_field as dof;
+    use sui::event::emit;
     use sui::object::{Self, ID, UID};
     use sui::object_bag::{Self, ObjectBag};
     use sui::package;
@@ -49,6 +50,15 @@ module holasui::escrow {
         recipient_coin_amount: u64,
     }
 
+    // ======== Events =========
+
+    struct OfferCreated has copy, drop {
+        offer_id: ID,
+    }
+
+    struct Exchanged has copy, drop {
+        offer_id: ID,
+    }
 
     // ======== Functions =========
 
@@ -142,6 +152,10 @@ module holasui::escrow {
 
         offer.active = true;
 
+        emit(OfferCreated {
+            offer_id: object::id(&offer)
+        });
+
         dof::add<ID, EscrowOffer<T>>(&mut hub.id, object::id(&offer), offer);
     }
 
@@ -223,6 +237,10 @@ module holasui::escrow {
         check_recipient_offer(offer);
 
         offer.active = false;
+
+        emit(Exchanged {
+            offer_id: object::id(offer)
+        });
 
         let recipient = offer.recipient;
         transfer_creator_offers(offer, recipient);
