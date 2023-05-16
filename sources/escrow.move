@@ -4,6 +4,7 @@ module holasui::escrow {
 
     use sui::balance::{Self, Balance};
     use sui::coin::{Self, Coin};
+    use sui::dynamic_object_field as dof;
     use sui::object::{Self, ID, UID};
     use sui::object_bag::{Self, ObjectBag};
     use sui::package;
@@ -34,7 +35,7 @@ module holasui::escrow {
     }
 
     /// An object held in escrow
-    struct EscrowOffer<phantom T> has key {
+    struct EscrowOffer<phantom T> has key, store {
         id: UID,
         active: bool,
         object_bag: ObjectBag,
@@ -78,7 +79,7 @@ module holasui::escrow {
 
     // ======== Creator of Offer functions ========
 
-    entry fun create<T>(
+    public fun create<T>(
         creator_object_ids: vector<ID>,
         creator_coin_amount: u64,
         recipient: address,
@@ -102,7 +103,7 @@ module holasui::escrow {
         }
     }
 
-    entry fun update_creator_objects<T: key + store>(
+    public fun update_creator_objects<T: key + store>(
         offer: EscrowOffer<T>,
         item: T,
         ctx: &mut TxContext
@@ -116,7 +117,7 @@ module holasui::escrow {
         offer
     }
 
-    entry fun update_creator_coin<T>(
+    public fun update_creator_coin<T>(
         offer: EscrowOffer<T>,
         coin: Coin<SUI>,
         ctx: &mut TxContext
@@ -131,6 +132,7 @@ module holasui::escrow {
     }
 
     entry fun share_offer<T>(
+        hub: &mut EscrowHub,
         offer: EscrowOffer<T>,
         ctx: &mut TxContext
     ) {
@@ -140,13 +142,16 @@ module holasui::escrow {
 
         offer.active = true;
 
-        share_object(offer);
+        dof::add<ID, EscrowOffer<T>>(&mut hub.id, object::id(&offer), offer);
     }
 
     entry fun cancel_creator_offer<T: key + store>(
-        offer: &mut EscrowOffer<T>,
+        hub: &mut EscrowHub,
+        offer_id: ID,
         ctx: &mut TxContext
     ) {
+        let offer = dof::borrow_mut<ID, EscrowOffer<T>>(&mut hub.id, offer_id);
+
         assert!(offer.active, EInactiveOffer);
         assert!(sender(ctx) == offer.creator, EWrongOwner);
 
@@ -158,10 +163,13 @@ module holasui::escrow {
     // ======== Recipient of Offer functions ========
 
     entry fun update_recipient_objects<T: key + store>(
-        offer: &mut EscrowOffer<T>,
+        hub: &mut EscrowHub,
+        offer_id: ID,
         item: T,
         ctx: &mut TxContext
     ) {
+        let offer = dof::borrow_mut<ID, EscrowOffer<T>>(&mut hub.id, offer_id);
+
         assert!(offer.active, EInactiveOffer);
         assert!(sender(ctx) == offer.recipient, EWrongRecipient);
 
@@ -171,10 +179,13 @@ module holasui::escrow {
     }
 
     entry fun update_recipient_coin<T>(
-        offer: &mut EscrowOffer<T>,
+        hub: &mut EscrowHub,
+        offer_id: ID,
         coin: Coin<SUI>,
         ctx: &mut TxContext
     ) {
+        let offer = dof::borrow_mut<ID, EscrowOffer<T>>(&mut hub.id, offer_id);
+
         assert!(offer.active, EInactiveOffer);
         assert!(sender(ctx) == offer.recipient, EWrongRecipient);
 
@@ -184,27 +195,34 @@ module holasui::escrow {
     }
 
     entry fun cancel_recipient_offer<T: key + store>(
-        offer: &mut EscrowOffer<T>,
+        hub: &mut EscrowHub,
+        offer_id: ID,
         ctx: &mut TxContext
     ) {
+        let offer = dof::borrow_mut<ID, EscrowOffer<T>>(&mut hub.id, offer_id);
+
         assert!(sender(ctx) == offer.recipient, EWrongRecipient);
 
         transfer_recipient_offers(offer, sender(ctx));
     }
 
     entry fun exchange<T: key + store>(
-        offer: &mut EscrowOffer<T>,
         hub: &mut EscrowHub,
+        offer_id: ID,
         coin: Coin<SUI>,
         ctx: &mut TxContext
     ) {
+        handle_payment(hub, coin, ctx);
+
+        let offer = dof::borrow_mut<ID, EscrowOffer<T>>(&mut hub.id, offer_id);
+
         assert!(offer.active, EInactiveOffer);
         assert!(sender(ctx) == offer.recipient, EWrongRecipient);
 
-        handle_payment(hub, coin, ctx);
-
         check_creator_offer(offer);
         check_recipient_offer(offer);
+
+        offer.active = false;
 
         let recipient = offer.recipient;
         transfer_creator_offers(offer, recipient);
