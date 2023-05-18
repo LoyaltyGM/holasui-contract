@@ -90,17 +90,18 @@ module holasui::escrow {
     // ======== Creator of Offer functions ========
 
     public fun create<T>(
+        hub: &mut EscrowHub,
         creator_object_ids: vector<ID>,
         creator_coin_amount: u64,
         recipient: address,
         recipient_object_ids: vector<ID>,
         recipient_coin_amount: u64,
         ctx: &mut TxContext
-    ): EscrowOffer<T> {
+    ): &mut EscrowOffer<T> {
         assert!(recipient != sender(ctx), EWrongRecipient);
         assert!(vector::length(&creator_object_ids) > 0 || vector::length(&recipient_object_ids) > 0, EInvalidOffer);
 
-        EscrowOffer {
+        let escrow = EscrowOffer {
             id: object::new(ctx),
             active: false,
             object_bag: object_bag::new(ctx),
@@ -110,7 +111,12 @@ module holasui::escrow {
             recipient,
             recipient_object_ids,
             recipient_coin_amount,
-        }
+        };
+
+        let id = object::id(&escrow);
+
+        dof::add<ID, EscrowOffer<T>>(&mut hub.id, id, escrow);
+        dof::borrow_mut(&mut hub.id, id)
     }
 
     entry fun update_creator_objects<T: key + store>(
