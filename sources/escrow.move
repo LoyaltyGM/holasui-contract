@@ -113,32 +113,30 @@ module holasui::escrow {
         }
     }
 
-    public fun update_creator_objects<T: key + store>(
-        offer: EscrowOffer<T>,
+    entry fun update_creator_objects<T: key + store>(
+        offer: &mut EscrowOffer<T>,
         item: T,
         ctx: &mut TxContext
-    ): EscrowOffer<T> {
+    ) {
+        assert!(!offer.active, EInactiveOffer);
         assert!(sender(ctx) == offer.creator, EWrongOwner);
 
         assert!(vector::contains(&offer.creator_object_ids, &object::id(&item)), EWrongObject);
 
         object_bag::add<ID, T>(&mut offer.object_bag, object::id(&item), item);
-
-        offer
     }
 
-    public fun update_creator_coin<T>(
-        offer: EscrowOffer<T>,
+    entry fun update_creator_coin<T>(
+        offer: &mut EscrowOffer<T>,
         coin: Coin<SUI>,
         ctx: &mut TxContext
-    ): EscrowOffer<T> {
+    ) {
+        assert!(!offer.active, EInactiveOffer);
         assert!(sender(ctx) == offer.creator, EWrongOwner);
 
         assert!(coin::value(&coin) == offer.creator_coin_amount, EWrongCoinAmount);
 
         object_bag::add<String, Coin<SUI>>(&mut offer.object_bag, key_creator_coin(), coin);
-
-        offer
     }
 
     entry fun share_offer<T>(
@@ -146,6 +144,7 @@ module holasui::escrow {
         offer: EscrowOffer<T>,
         ctx: &mut TxContext
     ) {
+        assert!(!offer.active, EInactiveOffer);
         assert!(sender(ctx) == offer.creator, EWrongOwner);
 
         check_creator_offer(&mut offer);
