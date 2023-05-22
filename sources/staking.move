@@ -9,7 +9,7 @@ module holasui::staking {
     use sui::dynamic_object_field as dof;
     use sui::event::emit;
     use sui::object::{Self, UID, ID};
-    use sui::package::{Self, Publisher};
+    use sui::package;
     use sui::pay;
     use sui::sui::SUI;
     use sui::table::{Self, Table};
@@ -21,7 +21,7 @@ module holasui::staking {
     // initial values
     const FEE_FOR_STAKE: u64 = 1000000000;
     const FEE_FOR_UNSTAKE: u64 = 3000000000;
-    const POINTS_PER_MINUTE: u64 = 1;
+    const POINTS_PER_DAY: u64 = 100;
 
     const TICKET_NAME: vector<u8> = b"Staking Ticket";
     const TICKET_IMAGE_URL: vector<u8> = b"ipfs://QmQiqGdJJb16QHaLPXDY6VZGqiDpehaSviU6vZQSvKdhNd";
@@ -64,17 +64,16 @@ module holasui::staking {
         name: String,
         fee_for_stake: u64,
         fee_for_unstake: u64,
-        points_per_minute: u64,
+        points_per_day: u64,
         /// Total staked nfts per current pool
         staked: u64,
+        // Optional nft rewards
+        rewards: Table<ID, RewardInfo>,
 
         // dof
 
         // Points for current pool
         // points: Table<address, u64>,
-
-        // Rewards info
-        // rewards: Table<ID, RewardInfo>,
     }
 
     struct StakingTicket has key {
@@ -131,10 +130,6 @@ module holasui::staking {
     // ======== Functions =========
 
     fun init(otw: STAKING, ctx: &mut TxContext) {
-        let admin_cap = AdminCap {
-            id: object::new(ctx),
-        };
-
         // Publisher
         let publisher = package::claim(otw, ctx);
 
@@ -154,7 +149,24 @@ module holasui::staking {
         );
         display::update_version(&mut ticket_display);
 
-        update_reward_display(&admin_cap, &publisher, ctx);
+        // Reward display
+        let reward_keys = vector[
+            utf8(b"name"),
+            utf8(b"description"),
+            utf8(b"image_url"),
+            utf8(b"project_url"),
+        ];
+        let reward_values = vector[
+            utf8(b"{name}"),
+            utf8(b"{description}"),
+            utf8(b"{url}"),
+            utf8(b"https://www.holasui.app"),
+        ];
+        let reward_display = display::new_with_fields<Reward>(
+            &publisher, reward_keys, reward_values, ctx
+        );
+        display::update_version(&mut reward_display);
+
 
         // Staking hub
         let hub = StakingHub {
@@ -167,7 +179,10 @@ module holasui::staking {
 
         public_transfer(publisher, sender(ctx));
         public_transfer(ticket_display, sender(ctx));
-        public_transfer(admin_cap, sender(ctx));
+        public_transfer(reward_display, sender(ctx));
+        public_transfer(AdminCap {
+            id: object::new(ctx),
+        }, sender(ctx));
         share_object(hub);
     }
 
@@ -186,43 +201,16 @@ module holasui::staking {
             name,
             fee_for_stake: FEE_FOR_STAKE,
             fee_for_unstake: FEE_FOR_UNSTAKE,
-            points_per_minute: POINTS_PER_MINUTE,
+            points_per_day: POINTS_PER_DAY,
             staked: 0,
+            rewards: table::new<ID, RewardInfo>(ctx),
         };
         dof::add<String, Table<address, u64>>(&mut pool.id, points_key(), table::new<address, u64>(ctx));
-        dof::add<String, Table<ID, RewardInfo>>(&mut pool.id, rewards_key(), table::new<ID, RewardInfo>(ctx));
 
         // Add poolId to list of pools
         table::add(borrow_hub_pools_mut(hub), object::id(&pool), true);
 
         share_object(pool);
-    }
-
-    // because init function not available when upgrading
-    entry fun update_reward_display(
-        _: &AdminCap,
-        publisher: &Publisher,
-        ctx: &mut TxContext
-    ) {
-        // Reward display
-        let reward_keys = vector[
-            utf8(b"name"),
-            utf8(b"description"),
-            utf8(b"image_url"),
-            utf8(b"project_url"),
-        ];
-        let reward_values = vector[
-            utf8(b"{name}"),
-            utf8(b"{description}"),
-            utf8(b"{url}"),
-            utf8(b"https://www.holasui.app"),
-        ];
-        let reward_display = display::new_with_fields<Reward>(
-            publisher, reward_keys, reward_values, ctx
-        );
-        display::update_version(&mut reward_display);
-
-        public_transfer(reward_display, sender(ctx));
     }
 
     entry fun add_pool_reward<T>(
@@ -238,10 +226,6 @@ module holasui::staking {
         points: u64,
         ctx: &mut TxContext
     ) {
-        if (!dof::exists_(&pool.id, rewards_key())) {
-            dof::add<String, Table<ID, RewardInfo>>(&mut pool.id, rewards_key(), table::new<ID, RewardInfo>(ctx));
-        };
-
         let reward_info = RewardInfo {
             id: object::new(ctx),
             name,
@@ -254,14 +238,12 @@ module holasui::staking {
         };
         dof::add(&mut reward_info.id, claimers_key(), table::new<address, u64>(ctx));
 
-        let pool_rewards = borrow_pool_rewards_mut(pool);
-        table::add(pool_rewards, object::id(&reward_info), reward_info);
+        table::add(&mut pool.rewards, object::id(&reward_info), reward_info);
     }
 
     public entry fun remove_pool_reward<T>(_: &AdminCap, pool: &mut StakingPool<T>, reward_id: ID) {
-        let pool_rewards = borrow_pool_rewards_mut(pool);
         let RewardInfo { id, points: _, description: _, url: _, name: _, per_address: _, supply: _, claimed: _ } = table::remove(
-            pool_rewards,
+            &mut pool.rewards,
             reward_id
         );
 
@@ -277,7 +259,7 @@ module holasui::staking {
     }
 
     public entry fun set_points_per_minute<T>(_: &AdminCap, pool: &mut StakingPool<T>, points: u64) {
-        pool.points_per_minute = points;
+        pool.points_per_day = points;
     }
 
     // ======== User functions =========
@@ -331,7 +313,7 @@ module holasui::staking {
 
         let nft = dof::remove<ID, T>(&mut pool.id, nft_id);
 
-        let points = ((clock::timestamp_ms(clock) - start_time) / 60000) * pool.points_per_minute;
+        let points = ((clock::timestamp_ms(clock) - start_time) / 60000) * pool.points_per_day;
 
         if (points > 0) {
             add_points(borrow_hub_points_mut(hub), sender(ctx), points);
@@ -357,7 +339,7 @@ module holasui::staking {
         clock: &Clock,
         ctx: &mut TxContext
     ) {
-        let points = ((clock::timestamp_ms(clock) - ticket.start_time) / 60000) * pool.points_per_minute;
+        let points = ((clock::timestamp_ms(clock) - ticket.start_time) / 60000) * pool.points_per_day;
 
         if (points > 0) {
             add_points(borrow_hub_points_mut(hub), sender(ctx), points);
@@ -379,7 +361,7 @@ module holasui::staking {
     ) {
         // ======== Reward =========
 
-        let reward_info = table::borrow_mut(borrow_pool_rewards_mut(pool), reward_info_id);
+        let reward_info = table::borrow_mut(&mut pool.rewards, reward_info_id);
         let reward_points = reward_info.points;
         let is_check_supply = option::is_some(&reward_info.supply);
         let is_check_per_address = option::is_some(&reward_info.per_address);
@@ -441,10 +423,6 @@ module holasui::staking {
         dof::borrow(&hub.id, pools_key())
     }
 
-    public fun borrow_pool_rewards<T>(pool: &StakingPool<T>): &Table<ID, RewardInfo> {
-        dof::borrow(&pool.id, rewards_key())
-    }
-
     public fun borrow_reward_claimers(reward_info: &RewardInfo): &Table<address, u64> {
         dof::borrow(&reward_info.id, claimers_key())
     }
@@ -455,10 +433,6 @@ module holasui::staking {
 
     public fun pools_key(): String {
         utf8(b"pools")
-    }
-
-    public fun rewards_key(): String {
-        utf8(b"rewards")
     }
 
     public fun claimers_key(): String {
@@ -511,10 +485,6 @@ module holasui::staking {
 
     fun borrow_hub_pools_mut(hub: &mut StakingHub): &mut Table<ID, bool> {
         dof::borrow_mut(&mut hub.id, pools_key())
-    }
-
-    fun borrow_pool_rewards_mut<T>(pool: &mut StakingPool<T>): &mut Table<ID, RewardInfo> {
-        dof::borrow_mut(&mut pool.id, rewards_key())
     }
 
     fun borrow_reward_claimers_mut(reward_info: &mut RewardInfo): &mut Table<address, u64> {
