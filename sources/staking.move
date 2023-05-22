@@ -8,6 +8,7 @@ module holasui::staking {
     use sui::display;
     use sui::dynamic_object_field as dof;
     use sui::event::emit;
+    use sui::math::min;
     use sui::object::{Self, UID, ID};
     use sui::package;
     use sui::pay;
@@ -35,6 +36,7 @@ module holasui::staking {
     const EInsufficientPoints: u64 = 2;
     const ERewardSupplyExpired: u64 = 3;
     const ERewardPerAddressExpired: u64 = 4;
+    const EStakingEnded: u64 = 5;
 
     // ======== Types =========
 
@@ -64,13 +66,15 @@ module holasui::staking {
     struct StakingPool<phantom T, phantom COIN> has key {
         id: UID,
         name: String,
+        /// End time of staking in milliseconds
+        end_time: u64,
         fee_for_stake: u64,
         fee_for_unstake: u64,
         fee_for_claim: u64,
         points_per_day: u64,
         /// Total staked nfts per current pool
         staked: u64,
-        // Optional nft rewards
+        /// Optional nft rewards
         rewards: Table<ID, RewardInfo>,
         balance: Balance<COIN>,
 
@@ -204,6 +208,7 @@ module holasui::staking {
         let pool = StakingPool<T, COIN> {
             id: object::new(ctx),
             name,
+            end_time: 0,
             fee_for_stake: FEE_FOR_STAKE,
             fee_for_unstake: FEE_FOR_UNSTAKE,
             points_per_day: POINTS_PER_DAY,
@@ -279,6 +284,7 @@ module holasui::staking {
         clock: &Clock,
         ctx: &mut TxContext
     ) {
+        assert!(clock::timestamp_ms(clock) < pool.end_time, EStakingEnded);
         handle_payment(hub, coin, pool.fee_for_stake, ctx);
 
         let nft_id: ID = object::id(&nft);
@@ -316,19 +322,19 @@ module holasui::staking {
     ) {
         handle_payment(hub, coin, pool.fee_for_unstake, ctx);
 
-        let StakingTicket { id, nft_id, start_time, name: _, url: _, } = ticket;
+        let points = calculate_points(pool, &ticket, clock);
 
-        let nft = dof::remove<ID, T>(&mut pool.id, nft_id);
 
-        let points = calculate_points(clock::timestamp_ms(clock), start_time, pool.points_per_day);
+        add_points(borrow_hub_points_mut(hub), sender(ctx), points);
+        add_points(borrow_pool_points_mut(pool), sender(ctx), points);
 
-        if (points > 0) {
-            add_points(borrow_hub_points_mut(hub), sender(ctx), points);
-            add_points(borrow_pool_points_mut(pool), sender(ctx), points);
-        };
 
         hub.staked = if (hub.staked > 0) hub.staked - 1 else 0 ;
         pool.staked = if (pool.staked > 0) pool.staked - 1 else 0 ;
+
+        let StakingTicket { id, nft_id, start_time: _, name: _, url: _, } = ticket;
+
+        let nft = dof::remove<ID, T>(&mut pool.id, nft_id);
 
         emit(Unstaked {
             nft_id,
@@ -349,12 +355,10 @@ module holasui::staking {
     ) {
         handle_payment(hub, coin, pool.fee_for_claim, ctx);
 
-        let points = calculate_points(clock::timestamp_ms(clock), ticket.start_time, pool.points_per_day);
+        let points = calculate_points(pool, ticket, clock);
 
-        if (points > 0) {
-            add_points(borrow_hub_points_mut(hub), sender(ctx), points);
-            add_points(borrow_pool_points_mut(pool), sender(ctx), points);
-        };
+        add_points(borrow_hub_points_mut(hub), sender(ctx), points);
+        add_points(borrow_pool_points_mut(pool), sender(ctx), points);
 
         emit(PointsClaimed {
             nft_id: ticket.nft_id,
@@ -461,6 +465,8 @@ module holasui::staking {
     }
 
     fun add_points(table: &mut Table<address, u64>, address: address, points_to_add: u64) {
+        if (points_to_add == 0) return;
+
         let address_points = 0;
 
         if (table::contains(table, address)) {
@@ -472,6 +478,8 @@ module holasui::staking {
     }
 
     fun sub_points(table: &mut Table<address, u64>, address: address, points_to_sub: u64) {
+        if (points_to_sub == 0) return;
+
         assert!(
             table::contains(table, address) && *table::borrow(table, address) >= points_to_sub,
             EInsufficientPoints
@@ -480,8 +488,8 @@ module holasui::staking {
         *address_points = *address_points - points_to_sub;
     }
 
-    fun calculate_points(start_time_ms: u64, end_time_ms: u64, points_per_day: u64): u64 {
-        ((end_time_ms - start_time_ms) / 1000 / 60 / 60 / 24) * points_per_day
+    fun calculate_points<T, COIN>(pool: &StakingPool<T, COIN>, ticket: &StakingTicket, clock: &Clock): u64 {
+        (min(pool.end_time,clock::timestamp_ms(clock)) - ticket.start_time) / 1000 / 60 / 60 / 24 * pool.points_per_day
     }
 
     fun borrow_pool_points_mut<T, COIN>(pool: &mut StakingPool<T, COIN>): &mut Table<address, u64> {
