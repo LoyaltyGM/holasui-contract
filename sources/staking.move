@@ -313,7 +313,7 @@ module holasui::staking {
 
         let nft = dof::remove<ID, T>(&mut pool.id, nft_id);
 
-        let points = ((clock::timestamp_ms(clock) - start_time) / 60000) * pool.points_per_day;
+        let points = calculate_points(clock::timestamp_ms(clock), start_time, pool.points_per_day);
 
         if (points > 0) {
             add_points(borrow_hub_points_mut(hub), sender(ctx), points);
@@ -339,7 +339,7 @@ module holasui::staking {
         clock: &Clock,
         ctx: &mut TxContext
     ) {
-        let points = ((clock::timestamp_ms(clock) - ticket.start_time) / 60000) * pool.points_per_day;
+        let points = calculate_points(clock::timestamp_ms(clock), ticket.start_time, pool.points_per_day);
 
         if (points > 0) {
             add_points(borrow_hub_points_mut(hub), sender(ctx), points);
@@ -470,9 +470,8 @@ module holasui::staking {
         *address_points = *address_points - points_to_sub;
     }
 
-    fun calculate_points(start_time: u64, end_time: u64, points_per_minute: u64): u64 {
-        let minutes = (end_time - start_time) / 60000;
-        minutes * points_per_minute
+    fun calculate_points(start_time_ms: u64, end_time_ms: u64, points_per_day: u64): u64 {
+        ((end_time_ms - start_time_ms) / 1000 / 60 / 60 / 24) * points_per_day
     }
 
     fun borrow_pool_points_mut<T>(pool: &mut StakingPool<T>): &mut Table<address, u64> {
