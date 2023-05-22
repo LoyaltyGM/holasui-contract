@@ -188,14 +188,14 @@ module holasui::staking {
 
     // ======== Admin functions =========
 
-    public entry fun withdraw(_: &AdminCap, hub: &mut StakingHub, ctx: &mut TxContext) {
+    entry fun withdraw(_: &AdminCap, hub: &mut StakingHub, ctx: &mut TxContext) {
         let amount = balance::value(&hub.balance);
         assert!(amount > 0, EZeroBalance);
 
         pay::keep(coin::take(&mut hub.balance, amount, ctx), ctx);
     }
 
-    public entry fun create_pool<T>(_: &AdminCap, hub: &mut StakingHub, name: String, ctx: &mut TxContext) {
+    entry fun create_pool<T>(_: &AdminCap, hub: &mut StakingHub, name: String, ctx: &mut TxContext) {
         let pool = StakingPool<T> {
             id: object::new(ctx),
             name,
@@ -241,7 +241,7 @@ module holasui::staking {
         table::add(&mut pool.rewards, object::id(&reward_info), reward_info);
     }
 
-    public entry fun remove_pool_reward<T>(_: &AdminCap, pool: &mut StakingPool<T>, reward_id: ID) {
+    entry fun remove_pool_reward<T>(_: &AdminCap, pool: &mut StakingPool<T>, reward_id: ID) {
         let RewardInfo { id, points: _, description: _, url: _, name: _, per_address: _, supply: _, claimed: _ } = table::remove(
             &mut pool.rewards,
             reward_id
@@ -250,21 +250,21 @@ module holasui::staking {
         object::delete(id);
     }
 
-    public entry fun set_fee_for_stake<T>(_: &AdminCap, pool: &mut StakingPool<T>, fee: u64) {
+    entry fun set_fee_for_stake<T>(_: &AdminCap, pool: &mut StakingPool<T>, fee: u64) {
         pool.fee_for_stake = fee;
     }
 
-    public entry fun set_fee_for_unstake<T>(_: &AdminCap, pool: &mut StakingPool<T>, fee: u64) {
+    entry fun set_fee_for_unstake<T>(_: &AdminCap, pool: &mut StakingPool<T>, fee: u64) {
         pool.fee_for_unstake = fee;
     }
 
-    public entry fun set_points_per_minute<T>(_: &AdminCap, pool: &mut StakingPool<T>, points: u64) {
+    entry fun set_points_per_minute<T>(_: &AdminCap, pool: &mut StakingPool<T>, points: u64) {
         pool.points_per_day = points;
     }
 
     // ======== User functions =========
 
-    public entry fun stake<T: key + store>(
+    entry fun stake<T: key + store>(
         nft: T,
         hub: &mut StakingHub,
         pool: &mut StakingPool<T>,
@@ -299,7 +299,7 @@ module holasui::staking {
         transfer(ticket, sender(ctx));
     }
 
-    public entry fun unstake<T: key + store>(
+    entry fun unstake<T: key + store>(
         ticket: StakingTicket,
         hub: &mut StakingHub,
         pool: &mut StakingPool<T>,
