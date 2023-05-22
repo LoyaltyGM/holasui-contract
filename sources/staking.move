@@ -245,16 +245,22 @@ module holasui::staking {
         handle_payment(hub, coin, pool.fee_for_unstake, ctx);
 
         let rewards = calculate_rewards(pool, &ticket, clock);
-
         add_rewards(borrow_hub_rewards_mut(hub), sender(ctx), rewards);
         add_rewards(borrow_pool_rewards_mut(pool), sender(ctx), rewards);
 
-        hub.staked = if (hub.staked > 0) hub.staked - 1 else 0 ;
-        pool.staked = if (pool.staked > 0) pool.staked - 1 else 0 ;
+        let sender_rewards = remove_rewards(borrow_pool_rewards_mut(pool), sender(ctx));
+        let sender_rewards_coin = coin::take(
+            &mut pool.rewards_balance,
+            sender_rewards,
+            ctx
+        );
 
         let StakingTicket { id, nft_id, start_time: _, name: _, url: _, } = ticket;
 
         let nft = dof::remove<ID, T>(&mut pool.id, nft_id);
+
+        hub.staked = if (hub.staked > 0) hub.staked - 1 else 0 ;
+        pool.staked = if (pool.staked > 0) pool.staked - 1 else 0 ;
 
         emit(Unstaked {
             nft_id,
@@ -263,6 +269,7 @@ module holasui::staking {
 
         object::delete(id);
         public_transfer(nft, sender(ctx));
+        pay::keep(sender_rewards_coin, ctx);
     }
 
     entry fun claim<T: key + store, COIN>(
@@ -276,9 +283,15 @@ module holasui::staking {
         handle_payment(hub, coin, pool.fee_for_claim, ctx);
 
         let rewards = calculate_rewards(pool, ticket, clock);
-
         add_rewards(borrow_hub_rewards_mut(hub), sender(ctx), rewards);
         add_rewards(borrow_pool_rewards_mut(pool), sender(ctx), rewards);
+
+        let sender_rewards = remove_rewards(borrow_pool_rewards_mut(pool), sender(ctx));
+        let sender_rewards_coin = coin::take(
+            &mut pool.rewards_balance,
+            sender_rewards,
+            ctx
+        );
 
         emit(Claimed {
             nft_id: ticket.nft_id,
@@ -286,6 +299,7 @@ module holasui::staking {
         });
 
         ticket.start_time = clock::timestamp_ms(clock);
+        pay::keep(sender_rewards_coin, ctx);
     }
 
 
@@ -321,6 +335,14 @@ module holasui::staking {
         };
 
         table::add(table, address, address_rewards + rewards_to_add);
+    }
+
+    fun remove_rewards(table: &mut Table<address, u64>, address: address): u64 {
+        if (table::contains(table, address)) {
+            table::remove(table, address)
+        } else {
+            0
+        }
     }
 
     fun calculate_rewards<T, COIN>(pool: &StakingPool<T, COIN>, ticket: &StakingTicket, clock: &Clock): u64 {
