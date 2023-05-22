@@ -33,7 +33,7 @@ module holasui::staking {
 
     const EInsufficientPay: u64 = 0;
     const EZeroBalance: u64 = 1;
-    const EInsufficientPoints: u64 = 2;
+    const EInsufficientRewards: u64 = 2;
     const EStakingEnded: u64 = 3;
 
     // ======== Types =========
@@ -56,8 +56,8 @@ module holasui::staking {
         // Pools
         // pools: Table<ID, bool>,
 
-        // Points from each pool
-        // points: Table<address, u64>, // total points from all pools
+        // Rewards from each pool
+        // rewards: Table<address, u64>, // total rewards from all pools
     }
 
     // Creatable by admin
@@ -69,15 +69,15 @@ module holasui::staking {
         fee_for_stake: u64,
         fee_for_unstake: u64,
         fee_for_claim: u64,
-        points_per_day: u64,
+        rewards_per_day: u64,
         /// Total staked nfts per current pool
         staked: u64,
         balance: Balance<COIN>,
 
         // dof
 
-        // Points for current pool
-        // points: Table<address, u64>,
+        // Rewards for current pool
+        // rewards: Table<address, u64>,
     }
 
     struct StakingTicket has key {
@@ -97,12 +97,12 @@ module holasui::staking {
 
     struct Unstaked has copy, drop {
         nft_id: ID,
-        points: u64,
+        rewards: u64,
     }
 
     struct Claimed has copy, drop {
         nft_id: ID,
-        points: u64,
+        rewards: u64,
     }
 
     // ======== Functions =========
@@ -133,7 +133,7 @@ module holasui::staking {
             balance: balance::zero(),
             staked: 0,
         };
-        dof::add<String, Table<address, u64>>(&mut hub.id, points_key(), table::new<address, u64>(ctx));
+        dof::add<String, Table<address, u64>>(&mut hub.id, rewards_key(), table::new<address, u64>(ctx));
         dof::add<String, Table<ID, bool>>(&mut hub.id, pools_key(), table::new<ID, bool>(ctx));
 
         public_transfer(publisher, sender(ctx));
@@ -171,12 +171,12 @@ module holasui::staking {
             end_time: 0,
             fee_for_stake: FEE_FOR_STAKE,
             fee_for_unstake: FEE_FOR_UNSTAKE,
-            points_per_day: POINTS_PER_DAY,
+            rewards_per_day: POINTS_PER_DAY,
             fee_for_claim: FEE_FOR_CLAIM,
             staked: 0,
             balance: balance::zero<COIN>(),
         };
-        dof::add<String, Table<address, u64>>(&mut pool.id, points_key(), table::new<address, u64>(ctx));
+        dof::add<String, Table<address, u64>>(&mut pool.id, rewards_key(), table::new<address, u64>(ctx));
 
         // Add poolId to list of pools
         table::add(borrow_hub_pools_mut(hub), object::id(&pool), true);
@@ -192,8 +192,8 @@ module holasui::staking {
         pool.fee_for_unstake = fee;
     }
 
-    entry fun set_points_per_minute<T, COIN>(_: &AdminCap, pool: &mut StakingPool<T, COIN>, points: u64) {
-        pool.points_per_day = points;
+    entry fun set_rewards_per_minute<T, COIN>(_: &AdminCap, pool: &mut StakingPool<T, COIN>, rewards: u64) {
+        pool.rewards_per_day = rewards;
     }
 
     // ======== User functions =========
@@ -244,10 +244,10 @@ module holasui::staking {
     ) {
         handle_payment(hub, coin, pool.fee_for_unstake, ctx);
 
-        let points = calculate_points(pool, &ticket, clock);
+        let rewards = calculate_rewards(pool, &ticket, clock);
 
-        add_points(borrow_hub_points_mut(hub), sender(ctx), points);
-        add_points(borrow_pool_points_mut(pool), sender(ctx), points);
+        add_rewards(borrow_hub_rewards_mut(hub), sender(ctx), rewards);
+        add_rewards(borrow_pool_rewards_mut(pool), sender(ctx), rewards);
 
         hub.staked = if (hub.staked > 0) hub.staked - 1 else 0 ;
         pool.staked = if (pool.staked > 0) pool.staked - 1 else 0 ;
@@ -258,7 +258,7 @@ module holasui::staking {
 
         emit(Unstaked {
             nft_id,
-            points,
+            rewards,
         });
 
         object::delete(id);
@@ -275,14 +275,14 @@ module holasui::staking {
     ) {
         handle_payment(hub, coin, pool.fee_for_claim, ctx);
 
-        let points = calculate_points(pool, ticket, clock);
+        let rewards = calculate_rewards(pool, ticket, clock);
 
-        add_points(borrow_hub_points_mut(hub), sender(ctx), points);
-        add_points(borrow_pool_points_mut(pool), sender(ctx), points);
+        add_rewards(borrow_hub_rewards_mut(hub), sender(ctx), rewards);
+        add_rewards(borrow_pool_rewards_mut(pool), sender(ctx), rewards);
 
         emit(Claimed {
             nft_id: ticket.nft_id,
-            points,
+            rewards,
         });
 
         ticket.start_time = clock::timestamp_ms(clock);
@@ -293,8 +293,8 @@ module holasui::staking {
 
     // ======== Utility functions =========
 
-    fun points_key(): String {
-        utf8(b"points")
+    fun rewards_key(): String {
+        utf8(b"rewards")
     }
 
     fun pools_key(): String {
@@ -310,29 +310,29 @@ module holasui::staking {
         pay::keep(coin, ctx);
     }
 
-    fun add_points(table: &mut Table<address, u64>, address: address, points_to_add: u64) {
-        if (points_to_add == 0) return;
+    fun add_rewards(table: &mut Table<address, u64>, address: address, rewards_to_add: u64) {
+        if (rewards_to_add == 0) return;
 
-        let address_points = 0;
+        let address_rewards = 0;
 
         if (table::contains(table, address)) {
-            address_points = *table::borrow(table, address);
+            address_rewards = *table::borrow(table, address);
             table::remove(table, address);
         };
 
-        table::add(table, address, address_points + points_to_add);
+        table::add(table, address, address_rewards + rewards_to_add);
     }
 
-    fun calculate_points<T, COIN>(pool: &StakingPool<T, COIN>, ticket: &StakingTicket, clock: &Clock): u64 {
-        (min(pool.end_time,clock::timestamp_ms(clock)) - ticket.start_time) / 1000 / 60 / 60 / 24 * pool.points_per_day
+    fun calculate_rewards<T, COIN>(pool: &StakingPool<T, COIN>, ticket: &StakingTicket, clock: &Clock): u64 {
+        (min(pool.end_time,clock::timestamp_ms(clock)) - ticket.start_time) / 1000 / 60 / 60 / 24 * pool.rewards_per_day
     }
 
-    fun borrow_pool_points_mut<T, COIN>(pool: &mut StakingPool<T, COIN>): &mut Table<address, u64> {
-        dof::borrow_mut(&mut pool.id, points_key())
+    fun borrow_pool_rewards_mut<T, COIN>(pool: &mut StakingPool<T, COIN>): &mut Table<address, u64> {
+        dof::borrow_mut(&mut pool.id, rewards_key())
     }
 
-    fun borrow_hub_points_mut(hub: &mut StakingHub): &mut Table<address, u64> {
-        dof::borrow_mut(&mut hub.id, points_key())
+    fun borrow_hub_rewards_mut(hub: &mut StakingHub): &mut Table<address, u64> {
+        dof::borrow_mut(&mut hub.id, rewards_key())
     }
 
     fun borrow_hub_pools_mut(hub: &mut StakingHub): &mut Table<ID, bool> {
