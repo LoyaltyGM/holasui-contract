@@ -323,17 +323,6 @@ module holasui::staking {
         table::add(table, address, address_points + points_to_add);
     }
 
-    fun sub_points(table: &mut Table<address, u64>, address: address, points_to_sub: u64) {
-        if (points_to_sub == 0) return;
-
-        assert!(
-            table::contains(table, address) && *table::borrow(table, address) >= points_to_sub,
-            EInsufficientPoints
-        );
-        let address_points = table::borrow_mut(table, address);
-        *address_points = *address_points - points_to_sub;
-    }
-
     fun calculate_points<T, COIN>(pool: &StakingPool<T, COIN>, ticket: &StakingTicket, clock: &Clock): u64 {
         (min(pool.end_time,clock::timestamp_ms(clock)) - ticket.start_time) / 1000 / 60 / 60 / 24 * pool.points_per_day
     }
