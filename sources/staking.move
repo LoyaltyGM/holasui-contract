@@ -197,11 +197,22 @@ module holasui::staking {
 
     // ======== Admin functions =========
 
-    entry fun withdraw(_: &AdminCap, hub: &mut StakingHub, ctx: &mut TxContext) {
+    entry fun withdraw_hub(_: &AdminCap, hub: &mut StakingHub, ctx: &mut TxContext) {
         let amount = balance::value(&hub.balance);
         assert!(amount > 0, EZeroBalance);
 
         pay::keep(coin::take(&mut hub.balance, amount, ctx), ctx);
+    }
+
+    entry fun deposit_pool<T, COIN>(pool: &mut StakingPool<T, COIN>, coin: Coin<COIN>) {
+        coin::put(&mut pool.balance, coin);
+    }
+
+    entry fun withdraw_pool<T, COIN>(_: &AdminCap, pool: &mut StakingPool<T, COIN>, ctx: &mut TxContext) {
+        let amount = balance::value(&pool.balance);
+        assert!(amount > 0, EZeroBalance);
+
+        pay::keep(coin::take(&mut pool.balance, amount, ctx), ctx);
     }
 
     entry fun create_pool<T, COIN>(_: &AdminCap, hub: &mut StakingHub, name: String, ctx: &mut TxContext) {
@@ -324,10 +335,8 @@ module holasui::staking {
 
         let points = calculate_points(pool, &ticket, clock);
 
-
         add_points(borrow_hub_points_mut(hub), sender(ctx), points);
         add_points(borrow_pool_points_mut(pool), sender(ctx), points);
-
 
         hub.staked = if (hub.staked > 0) hub.staked - 1 else 0 ;
         pool.staked = if (pool.staked > 0) pool.staked - 1 else 0 ;
