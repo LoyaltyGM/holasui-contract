@@ -343,9 +343,12 @@ module holasui::staking {
         ticket: &mut StakingTicket,
         hub: &mut StakingHub,
         pool: &mut StakingPool<T, COIN>,
+        coin: Coin<SUI>,
         clock: &Clock,
         ctx: &mut TxContext
     ) {
+        handle_payment(hub, coin, pool.fee_for_claim, ctx);
+
         let points = calculate_points(clock::timestamp_ms(clock), ticket.start_time, pool.points_per_day);
 
         if (points > 0) {
