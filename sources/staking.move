@@ -59,7 +59,7 @@ module holasui::staking {
     }
 
     // Creatable by admin
-    struct StakingPool<phantom T> has key {
+    struct StakingPool<phantom T, phantom COIN> has key {
         id: UID,
         name: String,
         fee_for_stake: u64,
@@ -69,6 +69,7 @@ module holasui::staking {
         staked: u64,
         // Optional nft rewards
         rewards: Table<ID, RewardInfo>,
+        balance: Balance<COIN>,
 
         // dof
 
@@ -85,6 +86,7 @@ module holasui::staking {
         start_time: u64,
     }
 
+    //TODO: change reward implementation
     struct RewardInfo has key, store {
         id: UID,
         name: String,
@@ -195,8 +197,8 @@ module holasui::staking {
         pay::keep(coin::take(&mut hub.balance, amount, ctx), ctx);
     }
 
-    entry fun create_pool<T>(_: &AdminCap, hub: &mut StakingHub, name: String, ctx: &mut TxContext) {
-        let pool = StakingPool<T> {
+    entry fun create_pool<T, COIN>(_: &AdminCap, hub: &mut StakingHub, name: String, ctx: &mut TxContext) {
+        let pool = StakingPool<T, COIN> {
             id: object::new(ctx),
             name,
             fee_for_stake: FEE_FOR_STAKE,
@@ -204,6 +206,7 @@ module holasui::staking {
             points_per_day: POINTS_PER_DAY,
             staked: 0,
             rewards: table::new<ID, RewardInfo>(ctx),
+            balance: balance::zero<COIN>(),
         };
         dof::add<String, Table<address, u64>>(&mut pool.id, points_key(), table::new<address, u64>(ctx));
 
@@ -213,9 +216,9 @@ module holasui::staking {
         share_object(pool);
     }
 
-    entry fun add_pool_reward<T>(
+    entry fun add_pool_reward<T, COIN>(
         _: &AdminCap,
-        pool: &mut StakingPool<T>,
+        pool: &mut StakingPool<T, COIN>,
         name: String,
         description: String,
         url: String,
@@ -241,7 +244,7 @@ module holasui::staking {
         table::add(&mut pool.rewards, object::id(&reward_info), reward_info);
     }
 
-    entry fun remove_pool_reward<T>(_: &AdminCap, pool: &mut StakingPool<T>, reward_id: ID) {
+    entry fun remove_pool_reward<T, COIN>(_: &AdminCap, pool: &mut StakingPool<T, COIN>, reward_id: ID) {
         let RewardInfo { id, points: _, description: _, url: _, name: _, per_address: _, supply: _, claimed: _ } = table::remove(
             &mut pool.rewards,
             reward_id
@@ -250,24 +253,24 @@ module holasui::staking {
         object::delete(id);
     }
 
-    entry fun set_fee_for_stake<T>(_: &AdminCap, pool: &mut StakingPool<T>, fee: u64) {
+    entry fun set_fee_for_stake<T, COIN>(_: &AdminCap, pool: &mut StakingPool<T, COIN>, fee: u64) {
         pool.fee_for_stake = fee;
     }
 
-    entry fun set_fee_for_unstake<T>(_: &AdminCap, pool: &mut StakingPool<T>, fee: u64) {
+    entry fun set_fee_for_unstake<T, COIN>(_: &AdminCap, pool: &mut StakingPool<T, COIN>, fee: u64) {
         pool.fee_for_unstake = fee;
     }
 
-    entry fun set_points_per_minute<T>(_: &AdminCap, pool: &mut StakingPool<T>, points: u64) {
+    entry fun set_points_per_minute<T, COIN>(_: &AdminCap, pool: &mut StakingPool<T, COIN>, points: u64) {
         pool.points_per_day = points;
     }
 
     // ======== User functions =========
 
-    entry fun stake<T: key + store>(
+    entry fun stake<T: key + store, COIN>(
         nft: T,
         hub: &mut StakingHub,
-        pool: &mut StakingPool<T>,
+        pool: &mut StakingPool<T, COIN>,
         coin: Coin<SUI>,
         clock: &Clock,
         ctx: &mut TxContext
@@ -299,10 +302,10 @@ module holasui::staking {
         transfer(ticket, sender(ctx));
     }
 
-    entry fun unstake<T: key + store>(
+    entry fun unstake<T: key + store, COIN>(
         ticket: StakingTicket,
         hub: &mut StakingHub,
-        pool: &mut StakingPool<T>,
+        pool: &mut StakingPool<T, COIN>,
         coin: Coin<SUI>,
         clock: &Clock,
         ctx: &mut TxContext
@@ -332,10 +335,10 @@ module holasui::staking {
         public_transfer(nft, sender(ctx));
     }
 
-    entry fun claim_points<T: key + store>(
+    entry fun claim_points<T: key + store, COIN>(
         ticket: &mut StakingTicket,
         hub: &mut StakingHub,
-        pool: &mut StakingPool<T>,
+        pool: &mut StakingPool<T, COIN>,
         clock: &Clock,
         ctx: &mut TxContext
     ) {
@@ -354,8 +357,8 @@ module holasui::staking {
         ticket.start_time = clock::timestamp_ms(clock);
     }
 
-    entry fun claim_reward<T>(
-        pool: &mut StakingPool<T>,
+    entry fun claim_reward<T, COIN>(
+        pool: &mut StakingPool<T, COIN>,
         reward_info_id: ID,
         ctx: &mut TxContext
     ) {
@@ -403,15 +406,15 @@ module holasui::staking {
 
     // ======== View functions =========
 
-    public fun get_address_hub_points<T>(hub: &StakingHub, address: address): u64 {
+    public fun get_address_hub_points<T, COIN>(hub: &StakingHub, address: address): u64 {
         *table::borrow(borrow_hub_points(hub), address)
     }
 
-    public fun get_address_pool_points<T>(pool: &StakingPool<T>, address: address): u64 {
+    public fun get_address_pool_points<T, COIN>(pool: &StakingPool<T, COIN>, address: address): u64 {
         *table::borrow(borrow_pool_points(pool), address)
     }
 
-    public fun borrow_pool_points<T>(pool: &StakingPool<T>): &Table<address, u64> {
+    public fun borrow_pool_points<T, COIN>(pool: &StakingPool<T, COIN>): &Table<address, u64> {
         dof::borrow(&pool.id, points_key())
     }
 
@@ -474,7 +477,7 @@ module holasui::staking {
         ((end_time_ms - start_time_ms) / 1000 / 60 / 60 / 24) * points_per_day
     }
 
-    fun borrow_pool_points_mut<T>(pool: &mut StakingPool<T>): &mut Table<address, u64> {
+    fun borrow_pool_points_mut<T, COIN>(pool: &mut StakingPool<T, COIN>): &mut Table<address, u64> {
         dof::borrow_mut(&mut pool.id, points_key())
     }
 
