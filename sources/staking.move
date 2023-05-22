@@ -19,6 +19,7 @@ module holasui::staking {
 
     // ======== Constants =========
     // initial values
+    // TODO: add versioning/migration
     const VERSION: u64 = 1;
     const FEE_FOR_STAKE: u64 = 1000000000;
     const FEE_FOR_UNSTAKE: u64 = 3000000000;
@@ -264,7 +265,7 @@ module holasui::staking {
         public_transfer(nft, sender(ctx));
     }
 
-    entry fun claim_points<T: key + store, COIN>(
+    entry fun claim<T: key + store, COIN>(
         ticket: &mut StakingTicket,
         hub: &mut StakingHub,
         pool: &mut StakingPool<T, COIN>,
@@ -290,39 +291,15 @@ module holasui::staking {
 
     // ======== View functions =========
 
-    public fun get_address_hub_points<T, COIN>(hub: &StakingHub, address: address): u64 {
-        *table::borrow(borrow_hub_points(hub), address)
-    }
+    // ======== Utility functions =========
 
-    public fun get_address_pool_points<T, COIN>(pool: &StakingPool<T, COIN>, address: address): u64 {
-        *table::borrow(borrow_pool_points(pool), address)
-    }
-
-    public fun borrow_pool_points<T, COIN>(pool: &StakingPool<T, COIN>): &Table<address, u64> {
-        dof::borrow(&pool.id, points_key())
-    }
-
-    public fun borrow_hub_points(hub: &StakingHub): &Table<address, u64> {
-        dof::borrow(&hub.id, points_key())
-    }
-
-    public fun borrow_hub_pools(hub: &StakingHub): &Table<ID, bool> {
-        dof::borrow(&hub.id, pools_key())
-    }
-
-    public fun points_key(): String {
+    fun points_key(): String {
         utf8(b"points")
     }
 
-    public fun pools_key(): String {
+    fun pools_key(): String {
         utf8(b"pools")
     }
-
-    public fun claimers_key(): String {
-        utf8(b"claimers")
-    }
-
-    // ======== Utility functions =========
 
     fun handle_payment(hub: &mut StakingHub, coin: Coin<SUI>, price: u64, ctx: &mut TxContext) {
         assert!(coin::value(&coin) >= price, EInsufficientPay);
