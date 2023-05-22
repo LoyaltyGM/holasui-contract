@@ -1,5 +1,4 @@
 module holasui::staking {
-    use std::option::{Self, Option};
     use std::string::{Self, String, utf8};
 
     use sui::balance::{Self, Balance};
@@ -34,9 +33,7 @@ module holasui::staking {
     const EInsufficientPay: u64 = 0;
     const EZeroBalance: u64 = 1;
     const EInsufficientPoints: u64 = 2;
-    const ERewardSupplyExpired: u64 = 3;
-    const ERewardPerAddressExpired: u64 = 4;
-    const EStakingEnded: u64 = 5;
+    const EStakingEnded: u64 = 3;
 
     // ======== Types =========
 
@@ -74,8 +71,6 @@ module holasui::staking {
         points_per_day: u64,
         /// Total staked nfts per current pool
         staked: u64,
-        /// Optional nft rewards
-        rewards: Table<ID, RewardInfo>,
         balance: Balance<COIN>,
 
         // dof
@@ -93,30 +88,6 @@ module holasui::staking {
         start_time: u64,
     }
 
-    //TODO: change reward implementation
-    struct RewardInfo has key, store {
-        id: UID,
-        name: String,
-        description: String,
-        url: Url,
-        claimed: u64,
-        supply: Option<u64>,
-        per_address: Option<u64>,
-        points: u64,
-
-        // dof
-        // claimers: Table<address, u64>,
-    }
-
-    struct Reward has key {
-        id: UID,
-        // ID of reward info
-        reward_info_id: ID,
-        name: String,
-        description: String,
-        url: Url,
-    }
-
     // ======== Events =========
 
     struct Staked has copy, drop {
@@ -128,14 +99,11 @@ module holasui::staking {
         points: u64,
     }
 
-    struct PointsClaimed has copy, drop {
+    struct Claimed has copy, drop {
         nft_id: ID,
         points: u64,
     }
 
-    struct RewardClaimed has copy, drop {
-        reward_info_id: ID,
-    }
     // ======== Functions =========
 
     fun init(otw: STAKING, ctx: &mut TxContext) {
@@ -158,25 +126,6 @@ module holasui::staking {
         );
         display::update_version(&mut ticket_display);
 
-        // Reward display
-        let reward_keys = vector[
-            utf8(b"name"),
-            utf8(b"description"),
-            utf8(b"image_url"),
-            utf8(b"project_url"),
-        ];
-        let reward_values = vector[
-            utf8(b"{name}"),
-            utf8(b"{description}"),
-            utf8(b"{url}"),
-            utf8(b"https://www.holasui.app"),
-        ];
-        let reward_display = display::new_with_fields<Reward>(
-            &publisher, reward_keys, reward_values, ctx
-        );
-        display::update_version(&mut reward_display);
-
-
         // Staking hub
         let hub = StakingHub {
             id: object::new(ctx),
@@ -188,7 +137,6 @@ module holasui::staking {
 
         public_transfer(publisher, sender(ctx));
         public_transfer(ticket_display, sender(ctx));
-        public_transfer(reward_display, sender(ctx));
         public_transfer(AdminCap {
             id: object::new(ctx),
         }, sender(ctx));
@@ -225,7 +173,6 @@ module holasui::staking {
             points_per_day: POINTS_PER_DAY,
             fee_for_claim: FEE_FOR_CLAIM,
             staked: 0,
-            rewards: table::new<ID, RewardInfo>(ctx),
             balance: balance::zero<COIN>(),
         };
         dof::add<String, Table<address, u64>>(&mut pool.id, points_key(), table::new<address, u64>(ctx));
@@ -234,43 +181,6 @@ module holasui::staking {
         table::add(borrow_hub_pools_mut(hub), object::id(&pool), true);
 
         share_object(pool);
-    }
-
-    entry fun add_pool_reward<T, COIN>(
-        _: &AdminCap,
-        pool: &mut StakingPool<T, COIN>,
-        name: String,
-        description: String,
-        url: String,
-        // if 0, then no limit
-        supply: u64,
-        // if 0, then no limit
-        per_address: u64,
-        points: u64,
-        ctx: &mut TxContext
-    ) {
-        let reward_info = RewardInfo {
-            id: object::new(ctx),
-            name,
-            description,
-            url: url::new_unsafe(string::to_ascii(url)),
-            claimed: 0,
-            supply: if (supply == 0) option::none() else option::some(supply),
-            per_address: if (per_address == 0) option::none() else option::some(per_address),
-            points,
-        };
-        dof::add(&mut reward_info.id, claimers_key(), table::new<address, u64>(ctx));
-
-        table::add(&mut pool.rewards, object::id(&reward_info), reward_info);
-    }
-
-    entry fun remove_pool_reward<T, COIN>(_: &AdminCap, pool: &mut StakingPool<T, COIN>, reward_id: ID) {
-        let RewardInfo { id, points: _, description: _, url: _, name: _, per_address: _, supply: _, claimed: _ } = table::remove(
-            &mut pool.rewards,
-            reward_id
-        );
-
-        object::delete(id);
     }
 
     entry fun set_fee_for_stake<T, COIN>(_: &AdminCap, pool: &mut StakingPool<T, COIN>, fee: u64) {
@@ -369,58 +279,12 @@ module holasui::staking {
         add_points(borrow_hub_points_mut(hub), sender(ctx), points);
         add_points(borrow_pool_points_mut(pool), sender(ctx), points);
 
-        emit(PointsClaimed {
+        emit(Claimed {
             nft_id: ticket.nft_id,
             points,
         });
 
         ticket.start_time = clock::timestamp_ms(clock);
-    }
-
-    entry fun claim_reward<T, COIN>(
-        pool: &mut StakingPool<T, COIN>,
-        reward_info_id: ID,
-        ctx: &mut TxContext
-    ) {
-        // ======== Reward =========
-
-        let reward_info = table::borrow_mut(&mut pool.rewards, reward_info_id);
-        let reward_points = reward_info.points;
-        let is_check_supply = option::is_some(&reward_info.supply);
-        let is_check_per_address = option::is_some(&reward_info.per_address);
-
-        // check if reward is still available
-        reward_info.claimed = reward_info.claimed + 1;
-        if (is_check_supply)
-            assert!(reward_info.claimed <= *option::borrow(&reward_info.supply), ERewardSupplyExpired);
-
-        // check if reward is still available per address
-        let reward_claimers = borrow_reward_claimers_mut(reward_info);
-        if (!table::contains(reward_claimers, sender(ctx))) {
-            table::add(reward_claimers, sender(ctx), 0);
-        };
-        let claimer_count = table::borrow_mut(reward_claimers, sender(ctx));
-        *claimer_count = *claimer_count + 1;
-        if (is_check_per_address)
-            assert!(*claimer_count <= *option::borrow(&reward_info.per_address), ERewardPerAddressExpired);
-
-        let reward = Reward {
-            id: object::new(ctx),
-            name: reward_info.name,
-            description: reward_info.description,
-            url: reward_info.url,
-            reward_info_id,
-        };
-
-        // ======== Points =========
-
-        sub_points(borrow_pool_points_mut(pool), sender(ctx), reward_points);
-
-        emit(RewardClaimed {
-            reward_info_id,
-        });
-
-        transfer(reward, sender(ctx));
     }
 
 
@@ -444,10 +308,6 @@ module holasui::staking {
 
     public fun borrow_hub_pools(hub: &StakingHub): &Table<ID, bool> {
         dof::borrow(&hub.id, pools_key())
-    }
-
-    public fun borrow_reward_claimers(reward_info: &RewardInfo): &Table<address, u64> {
-        dof::borrow(&reward_info.id, claimers_key())
     }
 
     public fun points_key(): String {
@@ -511,9 +371,5 @@ module holasui::staking {
 
     fun borrow_hub_pools_mut(hub: &mut StakingHub): &mut Table<ID, bool> {
         dof::borrow_mut(&mut hub.id, pools_key())
-    }
-
-    fun borrow_reward_claimers_mut(reward_info: &mut RewardInfo): &mut Table<address, u64> {
-        dof::borrow_mut(&mut reward_info.id, claimers_key())
     }
 }
