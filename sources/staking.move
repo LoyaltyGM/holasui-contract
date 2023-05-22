@@ -72,7 +72,7 @@ module holasui::staking {
         rewards_per_day: u64,
         /// Total staked nfts per current pool
         staked: u64,
-        balance: Balance<COIN>,
+        rewards_balance: Balance<COIN>,
 
         // dof
 
@@ -154,14 +154,14 @@ module holasui::staking {
     }
 
     entry fun deposit_pool<T, COIN>(pool: &mut StakingPool<T, COIN>, coin: Coin<COIN>) {
-        coin::put(&mut pool.balance, coin);
+        coin::put(&mut pool.rewards_balance, coin);
     }
 
     entry fun withdraw_pool<T, COIN>(_: &AdminCap, pool: &mut StakingPool<T, COIN>, ctx: &mut TxContext) {
-        let amount = balance::value(&pool.balance);
+        let amount = balance::value(&pool.rewards_balance);
         assert!(amount > 0, EZeroBalance);
 
-        pay::keep(coin::take(&mut pool.balance, amount, ctx), ctx);
+        pay::keep(coin::take(&mut pool.rewards_balance, amount, ctx), ctx);
     }
 
     entry fun create_pool<T, COIN>(_: &AdminCap, hub: &mut StakingHub, name: String, ctx: &mut TxContext) {
@@ -174,7 +174,7 @@ module holasui::staking {
             rewards_per_day: POINTS_PER_DAY,
             fee_for_claim: FEE_FOR_CLAIM,
             staked: 0,
-            balance: balance::zero<COIN>(),
+            rewards_balance: balance::zero<COIN>(),
         };
         dof::add<String, Table<address, u64>>(&mut pool.id, rewards_key(), table::new<address, u64>(ctx));
 
