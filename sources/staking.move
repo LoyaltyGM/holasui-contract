@@ -19,8 +19,10 @@ module holasui::staking {
 
     // ======== Constants =========
     // initial values
+    const VERSION: u64 = 1;
     const FEE_FOR_STAKE: u64 = 1000000000;
     const FEE_FOR_UNSTAKE: u64 = 3000000000;
+    const FEE_FOR_CLAIM: u64 = 1000000000;
     const POINTS_PER_DAY: u64 = 100;
 
     const TICKET_NAME: vector<u8> = b"Staking Ticket";
@@ -64,6 +66,7 @@ module holasui::staking {
         name: String,
         fee_for_stake: u64,
         fee_for_unstake: u64,
+        fee_for_claim: u64,
         points_per_day: u64,
         /// Total staked nfts per current pool
         staked: u64,
@@ -204,6 +207,7 @@ module holasui::staking {
             fee_for_stake: FEE_FOR_STAKE,
             fee_for_unstake: FEE_FOR_UNSTAKE,
             points_per_day: POINTS_PER_DAY,
+            fee_for_claim: FEE_FOR_CLAIM,
             staked: 0,
             rewards: table::new<ID, RewardInfo>(ctx),
             balance: balance::zero<COIN>(),
