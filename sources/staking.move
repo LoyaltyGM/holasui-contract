@@ -19,7 +19,6 @@ module holasui::staking {
 
     // ======== Constants =========
     // initial values
-    // TODO: add versioning/migration
     const VERSION: u64 = 1;
     const FEE_FOR_STAKE: u64 = 1000000000;
     const FEE_FOR_UNSTAKE: u64 = 3000000000;
@@ -35,6 +34,8 @@ module holasui::staking {
     const EZeroBalance: u64 = 1;
     const EInsufficientRewards: u64 = 2;
     const EStakingEnded: u64 = 3;
+    const EWrongVersion: u64 = 4;
+    const ENotUpgrade: u64 = 5;
 
     // ======== Types =========
 
@@ -47,6 +48,7 @@ module holasui::staking {
     // Only one instance of this struct is created
     struct StakingHub has key {
         id: UID,
+        version: u64,
         balance: Balance<SUI>,
         /// Total staked nfts per all pools
         staked: u64,
@@ -63,6 +65,7 @@ module holasui::staking {
     // Creatable by admin
     struct StakingPool<phantom NFT, phantom COIN> has key {
         id: UID,
+        version: u64,
         name: String,
         /// End time of staking in milliseconds
         end_time: u64,
@@ -130,6 +133,7 @@ module holasui::staking {
         // Staking hub
         let hub = StakingHub {
             id: object::new(ctx),
+            version: VERSION,
             balance: balance::zero(),
             staked: 0,
         };
@@ -147,17 +151,24 @@ module holasui::staking {
     // ======== Admin functions =========
 
     entry fun withdraw_hub(_: &AdminCap, hub: &mut StakingHub, ctx: &mut TxContext) {
+        check_hub_version(hub);
+
         let amount = balance::value(&hub.balance);
         assert!(amount > 0, EZeroBalance);
 
         pay::keep(coin::take(&mut hub.balance, amount, ctx), ctx);
     }
 
+    /// not only admin can call this function
     entry fun deposit_pool<NFT, COIN>(pool: &mut StakingPool<NFT, COIN>, coin: Coin<COIN>) {
+        check_pool_version(pool);
+
         coin::put(&mut pool.rewards_balance, coin);
     }
 
     entry fun withdraw_pool<NFT, COIN>(_: &AdminCap, pool: &mut StakingPool<NFT, COIN>, ctx: &mut TxContext) {
+        check_pool_version(pool);
+
         let amount = balance::value(&pool.rewards_balance);
         assert!(amount > 0, EZeroBalance);
 
@@ -165,14 +176,17 @@ module holasui::staking {
     }
 
     entry fun create_pool<NFT, COIN>(_: &AdminCap, hub: &mut StakingHub, name: String, ctx: &mut TxContext) {
+        check_hub_version(hub);
+
         let pool = StakingPool<NFT, COIN> {
             id: object::new(ctx),
+            version: VERSION,
             name,
             end_time: 0,
             fee_for_stake: FEE_FOR_STAKE,
             fee_for_unstake: FEE_FOR_UNSTAKE,
-            rewards_per_day: POINTS_PER_DAY,
             fee_for_claim: FEE_FOR_CLAIM,
+            rewards_per_day: POINTS_PER_DAY,
             staked: 0,
             rewards_balance: balance::zero<COIN>(),
         };
@@ -184,16 +198,52 @@ module holasui::staking {
         share_object(pool);
     }
 
+    entry fun set_name<NFT, COIN>(_: &AdminCap, pool: &mut StakingPool<NFT, COIN>, name: String) {
+        check_pool_version(pool);
+
+        pool.name = name;
+    }
+
+    entry fun update_end_time<NFT, COIN>(_: &AdminCap, pool: &mut StakingPool<NFT, COIN>, end_time: u64) {
+        check_pool_version(pool);
+
+        pool.end_time = end_time;
+    }
+
     entry fun set_fee_for_stake<NFT, COIN>(_: &AdminCap, pool: &mut StakingPool<NFT, COIN>, fee: u64) {
+        check_pool_version(pool);
+
         pool.fee_for_stake = fee;
     }
 
     entry fun set_fee_for_unstake<NFT, COIN>(_: &AdminCap, pool: &mut StakingPool<NFT, COIN>, fee: u64) {
+        check_pool_version(pool);
+
         pool.fee_for_unstake = fee;
     }
 
-    entry fun set_rewards_per_minute<NFT, COIN>(_: &AdminCap, pool: &mut StakingPool<NFT, COIN>, rewards: u64) {
+    entry fun set_fee_for_claim<NFT, COIN>(_: &AdminCap, pool: &mut StakingPool<NFT, COIN>, fee: u64) {
+        check_pool_version(pool);
+
+        pool.fee_for_claim = fee;
+    }
+
+    entry fun set_rewards_per_day<NFT, COIN>(_: &AdminCap, pool: &mut StakingPool<NFT, COIN>, rewards: u64) {
+        check_pool_version(pool);
+
         pool.rewards_per_day = rewards;
+    }
+
+    entry fun migrate_hub(_: AdminCap, hub: &mut StakingHub) {
+        assert!(hub.version < VERSION, ENotUpgrade);
+
+        hub.version = VERSION;
+    }
+
+    entry fun migrate_pool<NFT, COIN>(_: AdminCap, pool: &mut StakingPool<NFT, COIN>) {
+        assert!(pool.version < VERSION, ENotUpgrade);
+
+        pool.version = VERSION;
     }
 
     // ======== User functions =========
@@ -206,6 +256,9 @@ module holasui::staking {
         clock: &Clock,
         ctx: &mut TxContext
     ) {
+        check_hub_version(hub);
+        check_pool_version(pool);
+
         assert!(clock::timestamp_ms(clock) < pool.end_time, EStakingEnded);
         handle_payment(hub, coin, pool.fee_for_stake, ctx);
 
@@ -242,6 +295,9 @@ module holasui::staking {
         clock: &Clock,
         ctx: &mut TxContext
     ) {
+        check_hub_version(hub);
+        check_pool_version(pool);
+
         handle_payment(hub, coin, pool.fee_for_unstake, ctx);
 
         let rewards = calculate_rewards(pool, &ticket, clock);
@@ -280,6 +336,9 @@ module holasui::staking {
         clock: &Clock,
         ctx: &mut TxContext
     ) {
+        check_hub_version(hub);
+        check_pool_version(pool);
+
         handle_payment(hub, coin, pool.fee_for_claim, ctx);
 
         let rewards = calculate_rewards(pool, ticket, clock);
@@ -359,5 +418,13 @@ module holasui::staking {
 
     fun borrow_hub_pools_mut(hub: &mut StakingHub): &mut Table<ID, bool> {
         dof::borrow_mut(&mut hub.id, pools_key())
+    }
+
+    fun check_hub_version(hub: &StakingHub) {
+        assert!(hub.version == VERSION, EWrongVersion);
+    }
+
+    fun check_pool_version<NFT, COIN>(pool: &StakingPool<NFT, COIN>) {
+        assert!(pool.version == VERSION, EWrongVersion);
     }
 }
