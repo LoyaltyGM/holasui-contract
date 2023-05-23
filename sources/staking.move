@@ -18,7 +18,6 @@ module holasui::staking {
     use sui::url::{Self, Url};
 
     // ======== Constants =========
-    // initial values
     const VERSION: u64 = 1;
     const FEE_FOR_STAKE: u64 = 1000000000;
     const FEE_FOR_UNSTAKE: u64 = 3000000000;
