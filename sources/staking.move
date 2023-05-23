@@ -61,7 +61,7 @@ module holasui::staking {
     }
 
     // Creatable by admin
-    struct StakingPool<phantom T, phantom COIN> has key {
+    struct StakingPool<phantom NFT, phantom COIN> has key {
         id: UID,
         name: String,
         /// End time of staking in milliseconds
@@ -153,19 +153,19 @@ module holasui::staking {
         pay::keep(coin::take(&mut hub.balance, amount, ctx), ctx);
     }
 
-    entry fun deposit_pool<T, COIN>(pool: &mut StakingPool<T, COIN>, coin: Coin<COIN>) {
+    entry fun deposit_pool<NFT, COIN>(pool: &mut StakingPool<NFT, COIN>, coin: Coin<COIN>) {
         coin::put(&mut pool.rewards_balance, coin);
     }
 
-    entry fun withdraw_pool<T, COIN>(_: &AdminCap, pool: &mut StakingPool<T, COIN>, ctx: &mut TxContext) {
+    entry fun withdraw_pool<NFT, COIN>(_: &AdminCap, pool: &mut StakingPool<NFT, COIN>, ctx: &mut TxContext) {
         let amount = balance::value(&pool.rewards_balance);
         assert!(amount > 0, EZeroBalance);
 
         pay::keep(coin::take(&mut pool.rewards_balance, amount, ctx), ctx);
     }
 
-    entry fun create_pool<T, COIN>(_: &AdminCap, hub: &mut StakingHub, name: String, ctx: &mut TxContext) {
-        let pool = StakingPool<T, COIN> {
+    entry fun create_pool<NFT, COIN>(_: &AdminCap, hub: &mut StakingHub, name: String, ctx: &mut TxContext) {
+        let pool = StakingPool<NFT, COIN> {
             id: object::new(ctx),
             name,
             end_time: 0,
@@ -184,24 +184,24 @@ module holasui::staking {
         share_object(pool);
     }
 
-    entry fun set_fee_for_stake<T, COIN>(_: &AdminCap, pool: &mut StakingPool<T, COIN>, fee: u64) {
+    entry fun set_fee_for_stake<NFT, COIN>(_: &AdminCap, pool: &mut StakingPool<NFT, COIN>, fee: u64) {
         pool.fee_for_stake = fee;
     }
 
-    entry fun set_fee_for_unstake<T, COIN>(_: &AdminCap, pool: &mut StakingPool<T, COIN>, fee: u64) {
+    entry fun set_fee_for_unstake<NFT, COIN>(_: &AdminCap, pool: &mut StakingPool<NFT, COIN>, fee: u64) {
         pool.fee_for_unstake = fee;
     }
 
-    entry fun set_rewards_per_minute<T, COIN>(_: &AdminCap, pool: &mut StakingPool<T, COIN>, rewards: u64) {
+    entry fun set_rewards_per_minute<NFT, COIN>(_: &AdminCap, pool: &mut StakingPool<NFT, COIN>, rewards: u64) {
         pool.rewards_per_day = rewards;
     }
 
     // ======== User functions =========
 
-    entry fun stake<T: key + store, COIN>(
-        nft: T,
+    entry fun stake<NFT: key + store, COIN>(
+        nft: NFT,
         hub: &mut StakingHub,
-        pool: &mut StakingPool<T, COIN>,
+        pool: &mut StakingPool<NFT, COIN>,
         coin: Coin<SUI>,
         clock: &Clock,
         ctx: &mut TxContext
@@ -230,14 +230,14 @@ module holasui::staking {
             nft_id,
         });
 
-        dof::add<ID, T>(&mut pool.id, nft_id, nft);
+        dof::add<ID, NFT>(&mut pool.id, nft_id, nft);
         transfer(ticket, sender(ctx));
     }
 
-    entry fun unstake<T: key + store, COIN>(
+    entry fun unstake<NFT: key + store, COIN>(
         ticket: StakingTicket,
         hub: &mut StakingHub,
-        pool: &mut StakingPool<T, COIN>,
+        pool: &mut StakingPool<NFT, COIN>,
         coin: Coin<SUI>,
         clock: &Clock,
         ctx: &mut TxContext
@@ -257,7 +257,7 @@ module holasui::staking {
 
         let StakingTicket { id, nft_id, start_time: _, name: _, url: _, } = ticket;
 
-        let nft = dof::remove<ID, T>(&mut pool.id, nft_id);
+        let nft = dof::remove<ID, NFT>(&mut pool.id, nft_id);
 
         hub.staked = if (hub.staked > 0) hub.staked - 1 else 0 ;
         pool.staked = if (pool.staked > 0) pool.staked - 1 else 0 ;
@@ -272,10 +272,10 @@ module holasui::staking {
         pay::keep(sender_rewards_coin, ctx);
     }
 
-    entry fun claim<T: key + store, COIN>(
+    entry fun claim<NFT: key + store, COIN>(
         ticket: &mut StakingTicket,
         hub: &mut StakingHub,
-        pool: &mut StakingPool<T, COIN>,
+        pool: &mut StakingPool<NFT, COIN>,
         coin: Coin<SUI>,
         clock: &Clock,
         ctx: &mut TxContext
@@ -345,11 +345,11 @@ module holasui::staking {
         }
     }
 
-    fun calculate_rewards<T, COIN>(pool: &StakingPool<T, COIN>, ticket: &StakingTicket, clock: &Clock): u64 {
+    fun calculate_rewards<NFT, COIN>(pool: &StakingPool<NFT, COIN>, ticket: &StakingTicket, clock: &Clock): u64 {
         (min(pool.end_time,clock::timestamp_ms(clock)) - ticket.start_time) / 1000 / 60 / 60 / 24 * pool.rewards_per_day
     }
 
-    fun borrow_pool_rewards_mut<T, COIN>(pool: &mut StakingPool<T, COIN>): &mut Table<address, u64> {
+    fun borrow_pool_rewards_mut<NFT, COIN>(pool: &mut StakingPool<NFT, COIN>): &mut Table<address, u64> {
         dof::borrow_mut(&mut pool.id, rewards_key())
     }
 
