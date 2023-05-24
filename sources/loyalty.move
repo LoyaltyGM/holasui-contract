@@ -1,0 +1,3 @@
+module holasui::loyalty {
+
+}

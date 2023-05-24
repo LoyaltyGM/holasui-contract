@@ -17,8 +17,9 @@ module holasui::staking {
     use sui::tx_context::{TxContext, sender};
     use sui::url::{Self, Url};
 
+    use holasui::holasui::{AdminCap, version};
+
     // ======== Constants =========
-    const VERSION: u64 = 1;
     const FEE_FOR_STAKE: u64 = 1000000000;
     const FEE_FOR_UNSTAKE: u64 = 3000000000;
     const FEE_FOR_CLAIM: u64 = 1000000000;
@@ -39,10 +40,6 @@ module holasui::staking {
     // ======== Types =========
 
     struct STAKING has drop {}
-
-    struct AdminCap has key, store {
-        id: UID,
-    }
 
     // Only one instance of this struct is created
     struct StakingHub has key {
@@ -127,16 +124,13 @@ module holasui::staking {
         // Staking hub
         let hub = StakingHub {
             id: object::new(ctx),
-            version: VERSION,
+            version: version(),
             balance: balance::zero(),
         };
         dof::add<String, Table<ID, bool>>(&mut hub.id, pools_key(), table::new<ID, bool>(ctx));
 
         public_transfer(publisher, sender(ctx));
         public_transfer(ticket_display, sender(ctx));
-        public_transfer(AdminCap {
-            id: object::new(ctx),
-        }, sender(ctx));
         share_object(hub);
     }
 
@@ -172,7 +166,7 @@ module holasui::staking {
 
         let pool = StakingPool<NFT, COIN> {
             id: object::new(ctx),
-            version: VERSION,
+            version: version(),
             name,
             end_time: 0,
             fee_for_stake: FEE_FOR_STAKE,
@@ -227,15 +221,15 @@ module holasui::staking {
     }
 
     entry fun migrate_hub(_: &AdminCap, hub: &mut StakingHub) {
-        assert!(hub.version < VERSION, ENotUpgrade);
+        assert!(hub.version < version(), ENotUpgrade);
 
-        hub.version = VERSION;
+        hub.version = version();
     }
 
     entry fun migrate_pool<NFT, COIN>(_: &AdminCap, pool: &mut StakingPool<NFT, COIN>) {
-        assert!(pool.version < VERSION, ENotUpgrade);
+        assert!(pool.version < version(), ENotUpgrade);
 
-        pool.version = VERSION;
+        pool.version = version();
     }
 
     // ======== User functions =========
@@ -405,10 +399,10 @@ module holasui::staking {
     }
 
     fun check_hub_version(hub: &StakingHub) {
-        assert!(hub.version == VERSION, EWrongVersion);
+        assert!(hub.version == version(), EWrongVersion);
     }
 
     fun check_pool_version<NFT, COIN>(pool: &StakingPool<NFT, COIN>) {
-        assert!(pool.version == VERSION, EWrongVersion);
+        assert!(pool.version == version(), EWrongVersion);
     }
 }
