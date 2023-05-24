@@ -234,6 +234,7 @@ module holasui::staking {
 
     // ======== User functions =========
 
+    //todo: add hola points for stake
     entry fun stake<NFT: key + store, COIN>(
         nft: NFT,
         hub: &mut StakingHub,
