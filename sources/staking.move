@@ -122,7 +122,7 @@ module holasui::staking {
         let ticket_values = vector[
             utf8(b"{name}"),
             utf8(b"{url}"),
-            utf8(b"https://www.holasui.xyz"),
+            utf8(b"https://www.holasui.app"),
         ];
         let ticket_display = display::new_with_fields<StakingTicket>(
             &publisher, ticket_keys, ticket_values, ctx
