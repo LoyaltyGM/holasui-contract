@@ -49,8 +49,6 @@ module holasui::staking {
         id: UID,
         version: u64,
         balance: Balance<SUI>,
-        /// Total staked nfts per all pools
-        staked: u64,
 
         // dof
 
@@ -131,7 +129,6 @@ module holasui::staking {
             id: object::new(ctx),
             version: VERSION,
             balance: balance::zero(),
-            staked: 0,
         };
         dof::add<String, Table<ID, bool>>(&mut hub.id, pools_key(), table::new<ID, bool>(ctx));
 
@@ -271,7 +268,6 @@ module holasui::staking {
             start_time: clock::timestamp_ms(clock)
         };
 
-        hub.staked = hub.staked + 1;
         pool.staked = pool.staked + 1;
 
         emit(Staked {
@@ -309,7 +305,6 @@ module holasui::staking {
 
         let nft = dof::remove<ID, NFT>(&mut pool.id, nft_id);
 
-        hub.staked = if (hub.staked > 0) hub.staked - 1 else 0 ;
         pool.staked = if (pool.staked > 0) pool.staked - 1 else 0 ;
 
         emit(Unstaked {
