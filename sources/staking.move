@@ -229,13 +229,13 @@ module holasui::staking {
         pool.rewards_per_day = rewards;
     }
 
-    entry fun migrate_hub(_: AdminCap, hub: &mut StakingHub) {
+    entry fun migrate_hub(_: &AdminCap, hub: &mut StakingHub) {
         assert!(hub.version < VERSION, ENotUpgrade);
 
         hub.version = VERSION;
     }
 
-    entry fun migrate_pool<NFT, COIN>(_: AdminCap, pool: &mut StakingPool<NFT, COIN>) {
+    entry fun migrate_pool<NFT, COIN>(_: &AdminCap, pool: &mut StakingPool<NFT, COIN>) {
         assert!(pool.version < VERSION, ENotUpgrade);
 
         pool.version = VERSION;
