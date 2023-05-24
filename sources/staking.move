@@ -17,7 +17,7 @@ module holasui::staking {
     use sui::tx_context::{TxContext, sender};
     use sui::url::{Self, Url};
 
-    use holasui::holasui::{AdminCap, version};
+    use holasui::holasui::{AdminCap, version, project_url};
 
     // ======== Constants =========
     const FEE_FOR_STAKE: u64 = 1000000000;
@@ -77,7 +77,7 @@ module holasui::staking {
     struct StakingTicket has key {
         id: UID,
         name: String,
-        url: Url,
+        image_url: Url,
 
         nft_id: ID,
         start_time: u64,
@@ -113,8 +113,8 @@ module holasui::staking {
         ];
         let ticket_values = vector[
             utf8(b"{name}"),
-            utf8(b"{url}"),
-            utf8(b"https://www.holasui.app"),
+            utf8(b"{image_url}"),
+            project_url()
         ];
         let ticket_display = display::new_with_fields<StakingTicket>(
             &publisher, ticket_keys, ticket_values, ctx
@@ -257,7 +257,7 @@ module holasui::staking {
         let ticket = StakingTicket {
             id: object::new(ctx),
             name,
-            url: url::new_unsafe_from_bytes(TICKET_IMAGE_URL),
+            image_url: url::new_unsafe_from_bytes(TICKET_IMAGE_URL),
             nft_id,
             start_time: clock::timestamp_ms(clock)
         };
@@ -295,7 +295,7 @@ module holasui::staking {
             ctx
         );
 
-        let StakingTicket { id, nft_id, start_time: _, name: _, url: _, } = ticket;
+        let StakingTicket { id, nft_id, start_time: _, name: _, image_url: _, } = ticket;
 
         let nft = dof::remove<ID, NFT>(&mut pool.id, nft_id);
 

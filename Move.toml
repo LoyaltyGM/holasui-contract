@@ -1,6 +1,6 @@
 [package]
 name = "holasui"
-version = "0.0.1"
+version = "0.0.0"
 #published-at = ""
 
 [dependencies.Sui]
