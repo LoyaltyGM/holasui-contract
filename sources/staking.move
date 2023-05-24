@@ -56,9 +56,6 @@ module holasui::staking {
 
         // Pools
         // pools: Table<ID, bool>,
-
-        // Rewards from each pool
-        // rewards: Table<address, u64>, // total rewards from all pools
     }
 
     // Creatable by admin
@@ -136,7 +133,6 @@ module holasui::staking {
             balance: balance::zero(),
             staked: 0,
         };
-        dof::add<String, Table<address, u64>>(&mut hub.id, rewards_key(), table::new<address, u64>(ctx));
         dof::add<String, Table<ID, bool>>(&mut hub.id, pools_key(), table::new<ID, bool>(ctx));
 
         public_transfer(publisher, sender(ctx));
@@ -300,7 +296,6 @@ module holasui::staking {
         handle_payment(hub, coin, pool.fee_for_unstake, ctx);
 
         let rewards = calculate_rewards(pool, &ticket, clock);
-        add_rewards(borrow_hub_rewards_mut(hub), sender(ctx), rewards);
         add_rewards(borrow_pool_rewards_mut(pool), sender(ctx), rewards);
 
         let sender_rewards = remove_rewards(borrow_pool_rewards_mut(pool), sender(ctx));
@@ -341,7 +336,6 @@ module holasui::staking {
         handle_payment(hub, coin, pool.fee_for_claim, ctx);
 
         let rewards = calculate_rewards(pool, ticket, clock);
-        add_rewards(borrow_hub_rewards_mut(hub), sender(ctx), rewards);
         add_rewards(borrow_pool_rewards_mut(pool), sender(ctx), rewards);
 
         let sender_rewards = remove_rewards(borrow_pool_rewards_mut(pool), sender(ctx));
@@ -409,10 +403,6 @@ module holasui::staking {
 
     fun borrow_pool_rewards_mut<NFT, COIN>(pool: &mut StakingPool<NFT, COIN>): &mut Table<address, u64> {
         dof::borrow_mut(&mut pool.id, rewards_key())
-    }
-
-    fun borrow_hub_rewards_mut(hub: &mut StakingHub): &mut Table<address, u64> {
-        dof::borrow_mut(&mut hub.id, rewards_key())
     }
 
     fun borrow_hub_pools_mut(hub: &mut StakingHub): &mut Table<ID, bool> {
