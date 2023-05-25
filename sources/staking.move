@@ -31,9 +31,9 @@ module holasui::staking {
 
     // ======== Errors =========
 
-    const EStakingEnded: u64 = 0;
-    const EWrongVersion: u64 = 1;
-    const ENotUpgrade: u64 = 2;
+    const EWrongVersion: u64 = 0;
+    const ENotUpgrade: u64 = 1;
+    const EStakingEnded: u64 = 2;
 
     // ======== Types =========
 
