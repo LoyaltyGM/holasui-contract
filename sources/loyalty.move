@@ -24,6 +24,8 @@ module holasui::loyalty {
     const EWrongVersion: u64 = 0;
     const ENotUpgrade: u64 = 1;
     const ENotSpaceCreator: u64 = 2;
+    const ENotSpaceAdmin: u64 = 3;
+    const EInvalidTime: u64 = 4;
 
     // ======== Types =========
 
@@ -47,7 +49,7 @@ module holasui::loyalty {
         image_url: Url,
         website_url: Url,
         twitter_url: Url,
-        campaigns: Table<ID, Campaign>,
+        campaigns: Table<String, Campaign>,
     }
 
     struct SpaceAdminCap has key, store {
@@ -56,18 +58,17 @@ module holasui::loyalty {
         space_id: ID,
     }
 
-    struct Campaign has key, store {
-        id: UID,
+    struct Campaign has store {
         name: String,
         description: String,
-        image_url: Url,
+        reward_image_url: Url,
+        start_time: u64,
         end_time: u64,
         completed_count: u64,
-        quests: Table<ID, Quest>,
+        quests: Table<String, Quest>,
     }
 
-    struct Quest has key, store {
-        id: UID,
+    struct Quest has store {
         /// The name of the quest
         name: String,
         /// The description of the quest
@@ -174,6 +175,8 @@ module holasui::loyalty {
 
     // ======== SpaceAdmin functions =========
 
+    // ======== Space functions
+
     entry fun create_space(
         hub: &mut LoyaltyHub,
         name: String,
@@ -209,6 +212,202 @@ module holasui::loyalty {
         public_transfer(admin_cap, sender(ctx));
     }
 
+    entry fun update_space_name(admin_cap: &SpaceAdminCap, space: &mut Space, name: String) {
+        check_space_version(space);
+        check_space_admin(admin_cap, space);
+
+        space.name = name;
+    }
+
+    entry fun update_space_description(admin_cap: &SpaceAdminCap, space: &mut Space, description: String) {
+        check_space_version(space);
+        check_space_admin(admin_cap, space);
+
+        space.description = description;
+    }
+
+    entry fun update_space_image_url(admin_cap: &SpaceAdminCap, space: &mut Space, image_url: String) {
+        check_space_version(space);
+        check_space_admin(admin_cap, space);
+
+        space.image_url = url::new_unsafe(string::to_ascii(image_url));
+    }
+
+    entry fun update_space_website_url(admin_cap: &SpaceAdminCap, space: &mut Space, website_url: String) {
+        check_space_version(space);
+        check_space_admin(admin_cap, space);
+
+        space.website_url = url::new_unsafe(string::to_ascii(website_url));
+    }
+
+    entry fun update_space_twitter_url(admin_cap: &SpaceAdminCap, space: &mut Space, twitter_url: String) {
+        check_space_version(space);
+        check_space_admin(admin_cap, space);
+
+        space.twitter_url = url::new_unsafe(string::to_ascii(twitter_url));
+    }
+
+    // ======== Campaign functions
+
+    entry fun create_campaign(
+        admin_cap: &SpaceAdminCap,
+        space: &mut Space,
+        name: String,
+        description: String,
+        image_url: String,
+        start_time: u64,
+        end_time: u64,
+        ctx: &mut TxContext
+    ) {
+        check_space_version(space);
+        check_space_admin(admin_cap, space);
+        assert!(start_time < end_time, EInvalidTime);
+
+        let campaign = Campaign {
+            name,
+            description,
+            reward_image_url: url::new_unsafe(string::to_ascii(image_url)),
+            start_time,
+            end_time,
+            completed_count: 0,
+            quests: table::new(ctx),
+        };
+
+        table::add(&mut space.campaigns, campaign.name, campaign);
+    }
+
+    entry fun remove_campaign(admin_cap: &SpaceAdminCap, space: &mut Space, campaign_name: String) {
+        check_space_version(space);
+        check_space_admin(admin_cap, space);
+
+        let Campaign {
+            name: _,
+            description: _,
+            reward_image_url: _,
+            start_time: _,
+            end_time: _,
+            completed_count: _,
+            quests,
+        } = table::remove(&mut space.campaigns, campaign_name);
+
+        table::destroy_empty(quests);
+    }
+
+    entry fun update_campaign_name(admin_cap: &SpaceAdminCap, space: &mut Space, campaign_name: String, name: String) {
+        check_space_version(space);
+        check_space_admin(admin_cap, space);
+
+        let campaign = table::borrow_mut(&mut space.campaigns, campaign_name);
+        campaign.name = name;
+    }
+
+    entry fun update_campaign_description(
+        admin_cap: &SpaceAdminCap,
+        space: &mut Space,
+        campaign_name: String,
+        description: String
+    ) {
+        check_space_version(space);
+        check_space_admin(admin_cap, space);
+
+        let campaign = table::borrow_mut(&mut space.campaigns, campaign_name);
+        campaign.description = description;
+    }
+
+    entry fun update_campaign_reward_image_url(
+        admin_cap: &SpaceAdminCap,
+        space: &mut Space,
+        campaign_name: String,
+        image_url: String
+    ) {
+        check_space_version(space);
+        check_space_admin(admin_cap, space);
+
+        let campaign = table::borrow_mut(&mut space.campaigns, campaign_name);
+        campaign.reward_image_url = url::new_unsafe(string::to_ascii(image_url));
+    }
+
+    entry fun update_campaign_start_time(
+        admin_cap: &SpaceAdminCap,
+        space: &mut Space,
+        campaign_name: String,
+        start_time: u64
+    ) {
+        check_space_version(space);
+        check_space_admin(admin_cap, space);
+
+        let campaign = table::borrow_mut(&mut space.campaigns, campaign_name);
+        assert!(start_time < campaign.end_time, EInvalidTime);
+
+        campaign.start_time = start_time;
+    }
+
+    entry fun update_campaign_end_time(
+        admin_cap: &SpaceAdminCap,
+        space: &mut Space,
+        campaign_name: String,
+        end_time: u64
+    ) {
+        check_space_version(space);
+        check_space_admin(admin_cap, space);
+
+        let campaign = table::borrow_mut(&mut space.campaigns, campaign_name);
+        assert!(campaign.start_time < end_time, EInvalidTime);
+
+        campaign.end_time = end_time;
+    }
+
+    entry fun create_quest(
+        admin_cap: &SpaceAdminCap,
+        space: &mut Space,
+        campaign_name: String,
+        name: String,
+        description: String,
+        call_to_action_url: String,
+        package_id: ID,
+        module_name: String,
+        function_name: String,
+        arguments: vector<String>,
+        ctx: &mut TxContext
+    ) {
+        check_space_version(space);
+        check_space_admin(admin_cap, space);
+
+        let campaign = table::borrow_mut(&mut space.campaigns, campaign_name);
+
+        let quest = Quest {
+            name,
+            description,
+            call_to_action_url: url::new_unsafe(string::to_ascii(call_to_action_url)),
+            package_id,
+            module_name,
+            function_name,
+            arguments,
+            done: table::new(ctx)
+        };
+
+        table::add(&mut campaign.quests, quest.name, quest);
+    }
+
+    entry fun remove_quest(admin_cap: &SpaceAdminCap, space: &mut Space, campaign_name: String, quest_name: String) {
+        check_space_version(space);
+        check_space_admin(admin_cap, space);
+
+        let campaign = table::borrow_mut(&mut space.campaigns, campaign_name);
+        let Quest {
+            name: _,
+            description: _,
+            call_to_action_url: _,
+            package_id: _,
+            module_name: _,
+            function_name: _,
+            arguments: _,
+            done,
+        } = table::remove(&mut campaign.quests, quest_name);
+
+        table::drop(done);
+    }
+
     // ======== User functions =========
 
     // ======== Utility functions =========
@@ -229,5 +428,9 @@ module holasui::loyalty {
 
     fun check_space_version(space: &Space) {
         assert!(space.version == version(), EWrongVersion);
+    }
+
+    fun check_space_admin(admin_cap: &SpaceAdminCap, space: &Space) {
+        assert!(admin_cap.space_id == object::id(space), ENotSpaceAdmin);
     }
 }
