@@ -124,7 +124,12 @@ module holasui::loyalty {
 
     // ======== Admin functions =========
 
-    entry fun update_space_creators(_: &AdminCap, hub: &mut LoyaltyHub, creator: address, allowed_spaces_amount: u64) {
+    entry fun update_space_creators(
+        _: &AdminCap,
+        hub: &mut LoyaltyHub,
+        creator: address,
+        allowed_spaces_amount: u64
+    ) {
         if (!table::contains(&hub.space_creators, creator)) {
             table::add(&mut hub.space_creators, creator, allowed_spaces_amount);
         } else {

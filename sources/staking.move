@@ -328,7 +328,8 @@ module holasui::staking {
     // ======== Utility functions =========
 
     fun calculate_rewards<NFT, COIN>(pool: &StakingPool<NFT, COIN>, ticket: &StakingTicket, clock: &Clock): u64 {
-        (min(pool.end_time,clock::timestamp_ms(clock)) - ticket.start_time) / 1000 / 60 / 60 / 24 * pool.rewards_per_day
+        (min(pool.end_time,clock::timestamp_ms(clock)) - ticket.start_time)
+            / 1000 / 60 / 60 / 24 * pool.rewards_per_day
     }
 
     fun check_hub_version(hub: &StakingHub) {

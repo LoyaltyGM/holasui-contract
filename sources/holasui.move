@@ -1,3 +1,4 @@
+/// Main module of the holasui contract.
 module holasui::holasui {
     use std::string::{String, utf8};
 
