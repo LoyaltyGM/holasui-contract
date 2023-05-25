@@ -18,6 +18,7 @@ module holasui::staking {
     use sui::url::{Self, Url};
 
     use holasui::holasui::{AdminCap, version, project_url};
+    use holasui::utils::{withdraw_balance, handle_payment};
 
     // ======== Constants =========
     const FEE_FOR_STAKE: u64 = 1000000000;
@@ -30,12 +31,9 @@ module holasui::staking {
 
     // ======== Errors =========
 
-    const EInsufficientPay: u64 = 0;
-    const EZeroBalance: u64 = 1;
-    const EInsufficientRewards: u64 = 2;
-    const EStakingEnded: u64 = 3;
-    const EWrongVersion: u64 = 4;
-    const ENotUpgrade: u64 = 5;
+    const EStakingEnded: u64 = 0;
+    const EWrongVersion: u64 = 1;
+    const ENotUpgrade: u64 = 2;
 
     // ======== Types =========
 
@@ -130,10 +128,7 @@ module holasui::staking {
     entry fun withdraw_hub(_: &AdminCap, hub: &mut StakingHub, ctx: &mut TxContext) {
         check_hub_version(hub);
 
-        let amount = balance::value(&hub.balance);
-        assert!(amount > 0, EZeroBalance);
-
-        pay::keep(coin::take(&mut hub.balance, amount, ctx), ctx);
+        withdraw_balance(&mut hub.balance, ctx);
     }
 
     /// not only admin can call this function
@@ -146,10 +141,7 @@ module holasui::staking {
     entry fun withdraw_pool<NFT, COIN>(_: &AdminCap, pool: &mut StakingPool<NFT, COIN>, ctx: &mut TxContext) {
         check_pool_version(pool);
 
-        let amount = balance::value(&pool.rewards_balance);
-        assert!(amount > 0, EZeroBalance);
-
-        pay::keep(coin::take(&mut pool.rewards_balance, amount, ctx), ctx);
+        withdraw_balance(&mut pool.rewards_balance, ctx);
     }
 
     entry fun create_pool<NFT, COIN>(_: &AdminCap, hub: &mut StakingHub, name: String, ctx: &mut TxContext) {
@@ -237,7 +229,7 @@ module holasui::staking {
         check_pool_version(pool);
 
         assert!(clock::timestamp_ms(clock) < pool.end_time, EStakingEnded);
-        handle_payment(hub, coin, pool.fee_for_stake, ctx);
+        handle_payment(&mut hub.balance, coin, pool.fee_for_stake, ctx);
 
         let nft_id: ID = object::id(&nft);
 
@@ -274,7 +266,7 @@ module holasui::staking {
         check_hub_version(hub);
         check_pool_version(pool);
 
-        handle_payment(hub, coin, pool.fee_for_unstake, ctx);
+        handle_payment(&mut hub.balance, coin, pool.fee_for_unstake, ctx);
 
         let rewards = calculate_rewards(pool, &ticket, clock);
 
@@ -311,7 +303,7 @@ module holasui::staking {
         check_hub_version(hub);
         check_pool_version(pool);
 
-        handle_payment(hub, coin, pool.fee_for_claim, ctx);
+        handle_payment(&mut hub.balance, coin, pool.fee_for_claim, ctx);
 
         let rewards = calculate_rewards(pool, ticket, clock);
 
@@ -334,15 +326,6 @@ module holasui::staking {
     // ======== View functions =========
 
     // ======== Utility functions =========
-
-    fun handle_payment(hub: &mut StakingHub, coin: Coin<SUI>, price: u64, ctx: &mut TxContext) {
-        assert!(coin::value(&coin) >= price, EInsufficientPay);
-
-        let payment = coin::split(&mut coin, price, ctx);
-
-        coin::put(&mut hub.balance, payment);
-        pay::keep(coin, ctx);
-    }
 
     fun calculate_rewards<NFT, COIN>(pool: &StakingPool<NFT, COIN>, ticket: &StakingTicket, clock: &Clock): u64 {
         (min(pool.end_time,clock::timestamp_ms(clock)) - ticket.start_time) / 1000 / 60 / 60 / 24 * pool.rewards_per_day
