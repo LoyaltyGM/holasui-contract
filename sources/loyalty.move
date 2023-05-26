@@ -31,6 +31,10 @@ module holasui::loyalty {
 
     struct LOYALTY has drop {}
 
+    struct Verifier has key, store {
+        id: UID,
+    }
+
     struct LoyaltyHub has key {
         id: UID,
         version: u64,
@@ -121,6 +125,9 @@ module holasui::loyalty {
 
         public_transfer(publisher, sender(ctx));
         public_transfer(reward_display, sender(ctx));
+        public_transfer(Verifier {
+            id: object::new(ctx),
+        }, sender(ctx));
         share_object(LoyaltyHub {
             id: object::new(ctx),
             version: version(),
