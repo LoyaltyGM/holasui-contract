@@ -148,7 +148,7 @@ module holasui::loyalty {
 
     // ======== Admin functions =========
 
-    entry fun update_space_creators(
+    entry fun add_space_creator(
         _: &AdminCap,
         hub: &mut LoyaltyHub,
         creator: address,
