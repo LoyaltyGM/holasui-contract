@@ -4,6 +4,7 @@ module holasui::loyalty {
 
     use sui::balance::{Self, Balance};
     use sui::clock::{Self, Clock};
+    use sui::coin::Coin;
     use sui::display;
     use sui::object::{Self, UID, ID};
     use sui::package;
@@ -15,7 +16,7 @@ module holasui::loyalty {
     use sui::url::{Self, Url};
 
     use holasui::holasui::{AdminCap, project_url, version};
-    use holasui::utils::withdraw_balance;
+    use holasui::utils::{withdraw_balance, handle_payment};
 
     // ======== Constants =========
 
@@ -68,7 +69,7 @@ module holasui::loyalty {
         space_id: ID,
     }
 
-    struct Campaign has store {
+    struct Campaign has key, store {
         id: UID,
         name: String,
         description: String,
@@ -264,6 +265,8 @@ module holasui::loyalty {
     // ======== Campaign functions
 
     entry fun create_campaign(
+        hub: &mut LoyaltyHub,
+        coin: Coin<SUI>,
         admin_cap: &SpaceAdminCap,
         space: &mut Space,
         name: String,
@@ -276,6 +279,8 @@ module holasui::loyalty {
         check_space_version(space);
         check_space_admin(admin_cap, space);
         assert!(start_time < end_time, EInvalidTime);
+
+        handle_payment(&mut hub.balance, coin, hub.fee_for_creating_campaign, ctx);
 
         let campaign = Campaign {
             id: object::new(ctx),
