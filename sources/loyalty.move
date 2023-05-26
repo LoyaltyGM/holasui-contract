@@ -15,7 +15,7 @@ module holasui::loyalty {
     use sui::tx_context::{TxContext, sender};
     use sui::url::{Self, Url};
 
-    use holasui::holasui::{AdminCap, project_url, version};
+    use holasui::holasui::{Self, AdminCap, project_url, version, HolasuiHub};
     use holasui::utils::{withdraw_balance, handle_payment};
 
     // ======== Constants =========
@@ -437,6 +437,7 @@ module holasui::loyalty {
     // ======== User functions =========
 
     entry fun claim_campaign_reward(
+        holasui_hub: &mut HolasuiHub,
         space: &mut Space,
         campaign_id: ID,
         clock: &Clock,
@@ -449,6 +450,9 @@ module holasui::loyalty {
         assert!(clock::timestamp_ms(clock) <= campaign.end_time, EInvalidTime);
         assert!(!table::contains(&campaign.done, sender(ctx)), ECampaignAlreadyDone);
         check_campaign_quests_done(campaign, sender(ctx));
+
+        let hola_points = holasui::points_for_done_campaign(holasui_hub);
+        holasui::add_points_for_address(holasui_hub, hola_points,sender(ctx));
 
         table::add(&mut campaign.done, sender(ctx), true);
         transfer(Reward {

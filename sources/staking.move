@@ -17,7 +17,7 @@ module holasui::staking {
     use sui::tx_context::{TxContext, sender};
     use sui::url::{Self, Url};
 
-    use holasui::holasui::{AdminCap, version, project_url};
+    use holasui::holasui::{Self, AdminCap, version, project_url, HolasuiHub};
     use holasui::utils::{withdraw_balance, handle_payment};
 
     // ======== Constants =========
@@ -218,6 +218,7 @@ module holasui::staking {
 
     //todo: add hola points for stake
     entry fun stake<NFT: key + store, COIN>(
+        holasui_hub: &mut HolasuiHub,
         nft: NFT,
         hub: &mut StakingHub,
         pool: &mut StakingPool<NFT, COIN>,
@@ -250,6 +251,9 @@ module holasui::staking {
         emit(Staked {
             nft_id,
         });
+
+        let hola_points = holasui::points_for_stake(holasui_hub);
+        holasui::add_points_for_address(holasui_hub, hola_points,sender(ctx));
 
         dof::add<ID, NFT>(&mut pool.id, nft_id, nft);
         transfer(ticket, sender(ctx));
