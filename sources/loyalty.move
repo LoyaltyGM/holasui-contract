@@ -6,6 +6,7 @@ module holasui::loyalty {
     use sui::clock::{Self, Clock};
     use sui::coin::Coin;
     use sui::display;
+    use sui::event::emit;
     use sui::object::{Self, UID, ID};
     use sui::package;
     use sui::sui::SUI;
@@ -103,6 +104,19 @@ module holasui::loyalty {
         name: String,
         description: String,
         image_url: Url,
+        space_id: ID,
+        campaign_id: ID,
+    }
+
+    // ======== Events =========
+
+    struct QuestDone has copy, drop {
+        space_id: ID,
+        campaign_id: ID,
+        quest_index: u64,
+    }
+
+    struct CampaignDone has copy, drop {
         space_id: ID,
         campaign_id: ID,
     }
@@ -431,6 +445,12 @@ module holasui::loyalty {
         let quest = vector::borrow_mut(&mut campaign.quests, quest_index);
         assert!(!table::contains(&quest.done, user), EQuestAlreadyDone);
 
+        emit(QuestDone {
+            space_id: object::uid_to_inner(&space.id),
+            campaign_id,
+            quest_index
+        });
+
         table::add(&mut quest.done, user, true);
     }
 
@@ -450,6 +470,11 @@ module holasui::loyalty {
         assert!(clock::timestamp_ms(clock) <= campaign.end_time, EInvalidTime);
         assert!(!table::contains(&campaign.done, sender(ctx)), ECampaignAlreadyDone);
         check_campaign_quests_done(campaign, sender(ctx));
+
+        emit(CampaignDone {
+            space_id: object::uid_to_inner(&space.id),
+            campaign_id
+        });
 
         let hola_points = holasui::points_for_done_campaign(holasui_hub);
         holasui::add_points_for_address(holasui_hub, hola_points,sender(ctx));
