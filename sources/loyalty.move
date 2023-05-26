@@ -1,14 +1,16 @@
 module holasui::loyalty {
     use std::string::{Self, String, utf8};
+    use std::vector;
 
     use sui::balance::{Self, Balance};
+    use sui::clock::{Self, Clock};
     use sui::display;
     use sui::object::{Self, UID, ID};
     use sui::package;
     use sui::sui::SUI;
     use sui::table::{Self, Table};
     use sui::table_vec::{Self, TableVec};
-    use sui::transfer::{public_transfer, share_object};
+    use sui::transfer::{public_transfer, share_object, transfer};
     use sui::tx_context::{TxContext, sender};
     use sui::url::{Self, Url};
 
@@ -26,6 +28,10 @@ module holasui::loyalty {
     const ENotSpaceCreator: u64 = 2;
     const ENotSpaceAdmin: u64 = 3;
     const EInvalidTime: u64 = 4;
+    const EQuestAlreadyDone: u64 = 5;
+    const EQuestNotDone: u64 = 6;
+    const ECampaignAlreadyDone: u64 = 7;
+
 
     // ======== Types =========
 
@@ -53,7 +59,7 @@ module holasui::loyalty {
         image_url: Url,
         website_url: Url,
         twitter_url: Url,
-        campaigns: Table<String, Campaign>,
+        campaigns: Table<ID, Campaign>,
     }
 
     struct SpaceAdminCap has key, store {
@@ -63,13 +69,13 @@ module holasui::loyalty {
     }
 
     struct Campaign has store {
+        id: UID,
         name: String,
         description: String,
         reward_image_url: Url,
-        start_time: u64,
         end_time: u64,
-        completed_count: u64,
-        quests: Table<String, Quest>,
+        quests: vector<Quest>,
+        done: Table<address, bool>
     }
 
     struct Quest has store {
@@ -96,6 +102,7 @@ module holasui::loyalty {
         name: String,
         description: String,
         image_url: Url,
+        space_id: ID,
         campaign_id: ID,
     }
 
@@ -271,95 +278,81 @@ module holasui::loyalty {
         assert!(start_time < end_time, EInvalidTime);
 
         let campaign = Campaign {
+            id: object::new(ctx),
             name,
             description,
             reward_image_url: url::new_unsafe(string::to_ascii(image_url)),
-            start_time,
             end_time,
-            completed_count: 0,
-            quests: table::new(ctx),
+            quests: vector::empty(),
+            done: table::new(ctx)
         };
 
-        table::add(&mut space.campaigns, campaign.name, campaign);
+        table::add(&mut space.campaigns, object::id(&campaign), campaign);
     }
 
-    entry fun remove_campaign(admin_cap: &SpaceAdminCap, space: &mut Space, campaign_name: String) {
+    entry fun remove_campaign(admin_cap: &SpaceAdminCap, space: &mut Space, campaign_id: ID) {
         check_space_version(space);
         check_space_admin(admin_cap, space);
 
         let Campaign {
+            id,
             name: _,
             description: _,
             reward_image_url: _,
-            start_time: _,
             end_time: _,
-            completed_count: _,
             quests,
-        } = table::remove(&mut space.campaigns, campaign_name);
+            done
+        } = table::remove(&mut space.campaigns, campaign_id);
 
-        table::destroy_empty(quests);
+        vector::destroy_empty(quests);
+        table::drop(done);
+        object::delete(id)
     }
 
-    entry fun update_campaign_name(admin_cap: &SpaceAdminCap, space: &mut Space, campaign_name: String, name: String) {
+    entry fun update_campaign_name(admin_cap: &SpaceAdminCap, space: &mut Space, campaign_id: ID, name: String) {
         check_space_version(space);
         check_space_admin(admin_cap, space);
 
-        let campaign = table::borrow_mut(&mut space.campaigns, campaign_name);
+        let campaign = table::borrow_mut(&mut space.campaigns, campaign_id);
         campaign.name = name;
     }
 
     entry fun update_campaign_description(
         admin_cap: &SpaceAdminCap,
         space: &mut Space,
-        campaign_name: String,
+        campaign_id: ID,
         description: String
     ) {
         check_space_version(space);
         check_space_admin(admin_cap, space);
 
-        let campaign = table::borrow_mut(&mut space.campaigns, campaign_name);
+        let campaign = table::borrow_mut(&mut space.campaigns, campaign_id);
         campaign.description = description;
     }
 
     entry fun update_campaign_reward_image_url(
         admin_cap: &SpaceAdminCap,
         space: &mut Space,
-        campaign_name: String,
+        campaign_id: ID,
         image_url: String
     ) {
         check_space_version(space);
         check_space_admin(admin_cap, space);
 
-        let campaign = table::borrow_mut(&mut space.campaigns, campaign_name);
+        let campaign = table::borrow_mut(&mut space.campaigns, campaign_id);
         campaign.reward_image_url = url::new_unsafe(string::to_ascii(image_url));
-    }
-
-    entry fun update_campaign_start_time(
-        admin_cap: &SpaceAdminCap,
-        space: &mut Space,
-        campaign_name: String,
-        start_time: u64
-    ) {
-        check_space_version(space);
-        check_space_admin(admin_cap, space);
-
-        let campaign = table::borrow_mut(&mut space.campaigns, campaign_name);
-        assert!(start_time < campaign.end_time, EInvalidTime);
-
-        campaign.start_time = start_time;
     }
 
     entry fun update_campaign_end_time(
         admin_cap: &SpaceAdminCap,
         space: &mut Space,
-        campaign_name: String,
+        campaign_id: ID,
         end_time: u64
     ) {
         check_space_version(space);
         check_space_admin(admin_cap, space);
 
-        let campaign = table::borrow_mut(&mut space.campaigns, campaign_name);
-        assert!(campaign.start_time < end_time, EInvalidTime);
+        let campaign = table::borrow_mut(&mut space.campaigns, campaign_id);
 
         campaign.end_time = end_time;
     }
@@ -367,7 +360,7 @@ module holasui::loyalty {
     entry fun create_quest(
         admin_cap: &SpaceAdminCap,
         space: &mut Space,
-        campaign_name: String,
+        campaign_id: ID,
         name: String,
         description: String,
         call_to_action_url: String,
@@ -380,7 +373,7 @@ module holasui::loyalty {
         check_space_version(space);
         check_space_admin(admin_cap, space);
 
-        let campaign = table::borrow_mut(&mut space.campaigns, campaign_name);
+        let campaign = table::borrow_mut(&mut space.campaigns, campaign_id);
 
         let quest = Quest {
             name,
@@ -393,14 +386,14 @@ module holasui::loyalty {
             done: table::new(ctx)
         };
 
-        table::add(&mut campaign.quests, quest.name, quest);
+        vector::push_back(&mut campaign.quests, quest);
     }
 
-    entry fun remove_quest(admin_cap: &SpaceAdminCap, space: &mut Space, campaign_name: String, quest_name: String) {
+    entry fun remove_quest(admin_cap: &SpaceAdminCap, space: &mut Space, campaign_id: ID, quest_index: u64) {
         check_space_version(space);
         check_space_admin(admin_cap, space);
 
-        let campaign = table::borrow_mut(&mut space.campaigns, campaign_name);
+        let campaign = table::borrow_mut(&mut space.campaigns, campaign_id);
         let Quest {
             name: _,
             description: _,
@@ -410,12 +403,59 @@ module holasui::loyalty {
             function_name: _,
             arguments: _,
             done,
-        } = table::remove(&mut campaign.quests, quest_name);
+        } = vector::remove(&mut campaign.quests, quest_index);
 
         table::drop(done);
     }
 
+    // ======== Verifier functions =========
+
+    entry fun verify_campaign_quest(
+        _: &Verifier,
+        space: &mut Space,
+        campaign_id: ID,
+        quest_index: u64,
+        user: address,
+        clock: &Clock,
+    ) {
+        check_space_version(space);
+
+        let campaign = table::borrow_mut(&mut space.campaigns, campaign_id);
+        assert!(clock::timestamp_ms(clock) <= campaign.end_time, EInvalidTime);
+
+        let quest = vector::borrow_mut(&mut campaign.quests, quest_index);
+        assert!(!table::contains(&quest.done, user), EQuestAlreadyDone);
+
+        table::add(&mut quest.done, user, true);
+    }
+
     // ======== User functions =========
+
+    entry fun claim_campaign_reward(
+        space: &mut Space,
+        campaign_id: ID,
+        clock: &Clock,
+        ctx: &mut TxContext
+    ) {
+        check_space_version(space);
+
+        let campaign = table::borrow_mut(&mut space.campaigns, campaign_id);
+
+        assert!(clock::timestamp_ms(clock) <= campaign.end_time, EInvalidTime);
+        assert!(!table::contains(&campaign.done, sender(ctx)), ECampaignAlreadyDone);
+        check_campaign_quests_done(campaign, sender(ctx));
+
+        table::add(&mut campaign.done, sender(ctx), true);
+        transfer(Reward {
+            id: object::new(ctx),
+            name: campaign.name,
+            description: campaign.description,
+            image_url: campaign.reward_image_url,
+            space_id: object::id(space),
+            campaign_id
+        }, sender(ctx));
+    }
+
 
     // ======== Utility functions =========
 
@@ -428,6 +468,18 @@ module holasui::loyalty {
         let current_allowed_spaces_amount = table::borrow_mut(&mut hub.space_creators_allowlist, creator);
         *current_allowed_spaces_amount = *current_allowed_spaces_amount - 1;
     }
+
+    fun check_campaign_quests_done(campaign: &Campaign, address: address) {
+        let quests = &campaign.quests;
+
+        let i = 0;
+        while (i < vector::length(quests)) {
+            let quest = vector::borrow(quests, i);
+            assert!(table::contains(&quest.done, address), EQuestNotDone);
+            i = i + 1;
+        }
+    }
+
 
     fun check_hub_version(hub: &LoyaltyHub) {
         assert!(hub.version == version(), EWrongVersion);
