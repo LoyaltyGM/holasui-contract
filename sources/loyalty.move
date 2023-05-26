@@ -202,7 +202,7 @@ module holasui::loyalty {
         ctx: &mut TxContext
     ) {
         check_hub_version(hub);
-        update_space_creator(hub, sender(ctx));
+        handle_space_create(hub, sender(ctx));
 
         let space = Space {
             id: object::new(ctx),
@@ -464,7 +464,7 @@ module holasui::loyalty {
 
     // ======== Utility functions =========
 
-    fun update_space_creator(hub: &mut LoyaltyHub, creator: address) {
+    fun handle_space_create(hub: &mut LoyaltyHub, creator: address) {
         assert!(table::contains(&hub.space_creators_allowlist, creator) &&
             *table::borrow(&hub.space_creators_allowlist, creator) > 0,
             ENotSpaceCreator
