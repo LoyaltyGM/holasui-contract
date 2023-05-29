@@ -27,6 +27,7 @@ module holasui::holasui {
     struct HolasuiHub has key {
         id: UID,
         points_for_stake: u64,
+        points_for_swap: u64,
         points_for_done_campaign: u64,
         points: Table<address, u64>
     }
@@ -40,6 +41,7 @@ module holasui::holasui {
         share_object(HolasuiHub {
             id: object::new(ctx),
             points_for_stake: 10,
+            points_for_swap: 10,
             points_for_done_campaign: 10,
             points: table::new(ctx)
         });

@@ -13,8 +13,9 @@ module holasui::escrow {
     use sui::transfer::{share_object, public_transfer};
     use sui::tx_context::{TxContext, sender};
 
-    use holasui::holasui::{AdminCap, version};
+    use holasui::holasui::{AdminCap, version, HolasuiHub};
     use holasui::utils::{handle_payment, withdraw_balance};
+    use holasui::holasui;
 
     // ======== Errors =========
     const EWrongOwner: u64 = 0;
@@ -223,6 +224,7 @@ module holasui::escrow {
     }
 
     public fun exchange<T: key + store>(
+        holasui_hub: &mut HolasuiHub,
         hub: &mut EscrowHub,
         offer_id: ID,
         coin: Coin<SUI>,
@@ -239,6 +241,10 @@ module holasui::escrow {
         check_recipient_offer(offer);
 
         offer.active = false;
+
+        let hola_points = holasui::points_for_done_campaign(holasui_hub);
+        holasui::add_points_for_address(holasui_hub, hola_points,offer.creator);
+        holasui::add_points_for_address(holasui_hub, hola_points,offer.recipient);
 
         emit(Exchanged {
             offer_id: object::id(offer)
