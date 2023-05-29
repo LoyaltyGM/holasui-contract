@@ -9,6 +9,7 @@ module holasui::holasui {
 
     friend holasui::loyalty;
     friend holasui::staking;
+    friend holasui::escrow;
 
     // ======== Constants =========
 

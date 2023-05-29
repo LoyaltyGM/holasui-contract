@@ -6,6 +6,7 @@ module holasui::utils {
 
     friend holasui::loyalty;
     friend holasui::staking;
+    friend holasui::escrow;
 
     // ======== Errors =========
 
