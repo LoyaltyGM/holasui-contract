@@ -286,13 +286,11 @@ module holasui::loyalty {
         name: String,
         description: String,
         image_url: String,
-        start_time: u64,
         end_time: u64,
         ctx: &mut TxContext
     ) {
         check_space_version(space);
         check_space_admin(admin_cap, space);
-        assert!(start_time < end_time, EInvalidTime);
 
         handle_payment(&mut hub.balance, coin, hub.fee_for_creating_campaign, ctx);
 
