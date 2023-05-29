@@ -74,6 +74,10 @@ module holasui::holasui {
         hub.points_for_stake
     }
 
+    public(friend) fun points_for_swap(hub: &HolasuiHub): u64 {
+        hub.points_for_swap
+    }
+
     public(friend) fun points_for_done_campaign(hub: &HolasuiHub): u64 {
         hub.points_for_done_campaign
     }

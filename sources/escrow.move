@@ -242,7 +242,7 @@ module holasui::escrow {
 
         offer.active = false;
 
-        let hola_points = holasui::points_for_done_campaign(holasui_hub);
+        let hola_points = holasui::points_for_swap(holasui_hub);
         holasui::add_points_for_address(holasui_hub, hola_points,offer.creator);
         holasui::add_points_for_address(holasui_hub, hola_points,offer.recipient);
 
