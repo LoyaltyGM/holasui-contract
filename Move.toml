@@ -1,15 +1,16 @@
 [package]
 name = "holasui"
-version = "0.0.1"
-published-at = "0xeebdb577b6e4505caaf2b1235a0243e3314082a634218f2192d4aaba89bcb180"
+version = "0.0.0"
+#published-at = ""
 
 [dependencies.Sui]
 git = "https://github.com/MystenLabs/sui.git"
 subdir = "crates/sui-framework/packages/sui-framework"
-# testnet-1.0.0
-rev = "ae1212baf8f0837e25926d941db3d26a61c1bea2"
+# testnet-1.2.0
+rev = "7ef210c6c11828ebafce973d815fa8cae63bc8c4"
+# mainnet-1.1.0
+#rev = "4c9993fa095db8fa2a4791d8ad40d956ef3f6b9e"
+
 
 [addresses]
-# v0 = 0x3412f5d7819fddb9d504a422177e3cc62c029f08002a0d51c0f7cfd93cfdfbcc
-# v1 = 0xeebdb577b6e4505caaf2b1235a0243e3314082a634218f2192d4aaba89bcb180
 holasui = "0x0"
