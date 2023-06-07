@@ -1,0 +1,119 @@
+module holasui::dao {
+    use std::string::String;
+
+    use sui::balance::Balance;
+    use sui::object::{Self, UID, ID};
+    use sui::sui::SUI;
+    use sui::table::Table;
+    use sui::table_vec::{Self, TableVec};
+    use sui::transfer::share_object;
+    use sui::tx_context::TxContext;
+    use sui::vec_map::VecMap;
+
+    use holasui::staking::AdminCap;
+
+    // ======== Constants =========
+    const VERSION: u64 = 1;
+
+    // ======== Errors =========
+    const EWrongVersion: u64 = 0;
+    const ENotUpgrade: u64 = 1;
+
+    // ======== Types =========
+    struct DAO has drop {}
+
+    struct DaoHub has key {
+        id: UID,
+        version: u64,
+        daos: TableVec<ID>
+    }
+
+    struct Dao<phantom T> has key {
+        id: UID,
+        version: u64,
+        name: String,
+        description: String,
+        /// initial votes for each nft
+        initial_votes: u64,
+        /// minimum number of nfts voted for a proposal to pass
+        quorum: u64,
+        /// delay since proposal is created until voting start
+        voting_delay: u64,
+        /// duration of voting period
+        voting_period: u64,
+        treasury: Balance<SUI>,
+        proposals: Table<ID, Proposal>,
+
+        // TODO: add delegation
+    }
+
+    struct Proposal has key, store {
+        id: UID,
+        name: String,
+        description: String,
+        type: String,
+        creator: address,
+        start_time: u64,
+        end_time: u64,
+        // for, against, abstain
+        results: VecMap<String, u64>,
+        nft_votes: Table<ID, u64>,
+        address_votes: Table<address, u64>
+    }
+
+    // ======== Events =========
+
+    struct ProposalCreated has copy, drop {
+        id: ID,
+        name: String,
+        creator: address,
+    }
+
+    // ======== Functions =========
+
+    fun init(_: DAO, ctx: &mut TxContext) {
+        share_object(DaoHub {
+            id: object::new(ctx),
+            version: VERSION,
+            daos: table_vec::empty(ctx)
+        })
+    }
+
+    // ======== Admin functions =========
+
+    entry fun migrate_hub(_: &AdminCap, hub: &mut DaoHub) {
+        assert!(hub.version < VERSION, ENotUpgrade);
+
+        hub.version = VERSION;
+    }
+
+    entry fun migrate_dao<T>(_: &AdminCap, dao: &mut Dao<T>) {
+        assert!(dao.version < VERSION, ENotUpgrade);
+
+        dao.version = VERSION;
+    }
+
+    entry fun create_dao(
+        _: &AdminCap,
+        hub: &mut DaoHub,
+        name: String,
+        description: String,
+        initial_votes: u64,
+        ctx: &mut TxContext
+    ) {
+        check_hub_version(hub);
+    }
+
+    // ======== User functions =========
+
+
+    // ======== Utility functions =========
+
+    fun check_hub_version(hub: &DaoHub) {
+        assert!(hub.version == VERSION, EWrongVersion);
+    }
+
+    fun check_space_version<T>(dao: &Dao<T>) {
+        assert!(dao.version == VERSION, EWrongVersion);
+    }
+}
