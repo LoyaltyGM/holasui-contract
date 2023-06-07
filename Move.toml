@@ -1,7 +1,6 @@
 [package]
 name = "holasui"
-version = "0.0.0"
-#published-at = ""
+version = "2.0.0"
 
 [dependencies.Sui]
 git = "https://github.com/MystenLabs/sui.git"
