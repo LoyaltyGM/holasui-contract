@@ -1,10 +1,10 @@
 module holasui::dao {
     use std::string::String;
 
-    use sui::balance::Balance;
+    use sui::balance::{Self, Balance};
     use sui::object::{Self, UID, ID};
     use sui::sui::SUI;
-    use sui::table::Table;
+    use sui::table::{Self, Table};
     use sui::table_vec::{Self, TableVec};
     use sui::transfer::share_object;
     use sui::tx_context::TxContext;
@@ -33,13 +33,13 @@ module holasui::dao {
         version: u64,
         name: String,
         description: String,
-        /// initial votes for each nft
+        // initial votes for each nft
         initial_votes: u64,
-        /// minimum number of nfts voted for a proposal to pass
+        // minimum number of nfts voted for a proposal to pass
         quorum: u64,
-        /// delay since proposal is created until voting start
+        // delay since proposal is created until voting start
         voting_delay: u64,
-        /// duration of voting period
+        // duration of voting period
         voting_period: u64,
         treasury: Balance<SUI>,
         proposals: Table<ID, Proposal>,
@@ -93,15 +93,33 @@ module holasui::dao {
         dao.version = VERSION;
     }
 
-    entry fun create_dao(
+    entry fun create_dao<T>(
         _: &AdminCap,
         hub: &mut DaoHub,
         name: String,
         description: String,
         initial_votes: u64,
+        quorum: u64,
+        voting_delay: u64,
+        voting_period: u64,
         ctx: &mut TxContext
     ) {
         check_hub_version(hub);
+
+        let dao = Dao<T> {
+            id: object::new(ctx),
+            version: VERSION,
+            name,
+            description,
+            initial_votes,
+            quorum,
+            voting_delay,
+            voting_period,
+            treasury: balance::zero(),
+            proposals: table::new(ctx)
+        };
+
+        share_object(dao);
     }
 
     // ======== User functions =========
