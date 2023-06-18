@@ -2,13 +2,14 @@ module holasui::dao {
     use std::string::String;
 
     use sui::balance::{Self, Balance};
+    use sui::clock::{Self, Clock};
     use sui::object::{Self, UID, ID};
     use sui::sui::SUI;
     use sui::table::{Self, Table};
     use sui::table_vec::{Self, TableVec};
     use sui::transfer::share_object;
-    use sui::tx_context::TxContext;
-    use sui::vec_map::VecMap;
+    use sui::tx_context::{TxContext, sender};
+    use sui::vec_map::{Self, VecMap};
 
     use holasui::staking::AdminCap;
 
@@ -37,9 +38,9 @@ module holasui::dao {
         initial_votes: u64,
         // minimum number of nfts voted for a proposal to pass
         quorum: u64,
-        // delay since proposal is created until voting start
+        // delay since proposal is created until voting start in ms
         voting_delay: u64,
-        // duration of voting period
+        // duration of voting period in ms
         voting_period: u64,
         treasury: Balance<SUI>,
         proposals: Table<ID, Proposal>,
@@ -120,6 +121,32 @@ module holasui::dao {
         };
 
         share_object(dao);
+    }
+
+    public fun create_proposal<T>(
+        dao: &mut Dao<T>,
+        _: &T,
+        name: String,
+        description: String,
+        type: String,
+        clock: &Clock,
+        ctx: &mut TxContext
+    ) {
+        let proposal = Proposal {
+            id: object::new(ctx),
+            name,
+            description,
+            type,
+            creator: sender(ctx),
+            start_time: clock::timestamp_ms(clock) + dao.voting_delay,
+            end_time: clock::timestamp_ms(clock) + dao.voting_delay + dao.voting_period,
+            // for, against, abstain
+            results: vec_map::empty(),
+            nft_votes: table::new(ctx),
+            address_votes: table::new(ctx)
+        };
+
+        table::add(&mut dao.proposals, object::id(&proposal), proposal);
     }
 
     // ======== User functions =========
