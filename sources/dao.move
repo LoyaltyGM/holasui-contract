@@ -3,6 +3,7 @@ module holasui::dao {
 
     use sui::balance::{Self, Balance};
     use sui::clock::{Self, Clock};
+    use sui::event::emit;
     use sui::object::{Self, UID, ID};
     use sui::sui::SUI;
     use sui::table::{Self, Table};
@@ -132,6 +133,8 @@ module holasui::dao {
         clock: &Clock,
         ctx: &mut TxContext
     ) {
+        check_dao_version(dao);
+
         let proposal = Proposal {
             id: object::new(ctx),
             name,
@@ -146,6 +149,12 @@ module holasui::dao {
             address_votes: table::new(ctx)
         };
 
+        emit(ProposalCreated {
+            id: object::id(&proposal),
+            name: proposal.name,
+            creator: proposal.creator
+        });
+
         table::add(&mut dao.proposals, object::id(&proposal), proposal);
     }
 
@@ -158,7 +167,7 @@ module holasui::dao {
         assert!(hub.version == VERSION, EWrongVersion);
     }
 
-    fun check_space_version<T>(dao: &Dao<T>) {
+    fun check_dao_version<T>(dao: &Dao<T>) {
         assert!(dao.version == VERSION, EWrongVersion);
     }
 }
