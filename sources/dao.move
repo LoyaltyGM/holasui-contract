@@ -140,6 +140,12 @@ module holasui::dao {
     ) {
         check_dao_version(dao);
 
+        let results = vec_map::empty<u64, u64>();
+
+        vec_map::insert(&mut results, VOTE_FOR, 0);
+        vec_map::insert(&mut results, VOTE_AGAINST, 0);
+        vec_map::insert(&mut results, VOTE_ABSTAIN, 0);
+
         let proposal = Proposal {
             id: object::new(ctx),
             name,
@@ -149,7 +155,7 @@ module holasui::dao {
             start_time: clock::timestamp_ms(clock) + dao.voting_delay,
             end_time: clock::timestamp_ms(clock) + dao.voting_delay + dao.voting_period,
             // for, against, abstain
-            results: vec_map::empty(),
+            results,
             nft_votes: table::new(ctx),
             address_votes: table::new(ctx)
         };
