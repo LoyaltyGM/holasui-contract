@@ -17,6 +17,11 @@ module holasui::dao {
     // ======== Constants =========
     const VERSION: u64 = 1;
 
+    // Voting types
+    const VOTE_ABSTAIN: u64 = 0;
+    const VOTE_FOR: u64 = 1;
+    const VOTE_AGAINST: u64 = 2;
+
     // ======== Errors =========
     const EWrongVersion: u64 = 0;
     const ENotUpgrade: u64 = 1;
@@ -58,7 +63,7 @@ module holasui::dao {
         start_time: u64,
         end_time: u64,
         // for, against, abstain
-        results: VecMap<String, u64>,
+        results: VecMap<u64, u64>,
         nft_votes: Table<ID, u64>,
         address_votes: Table<address, u64>
     }
