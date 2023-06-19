@@ -43,7 +43,7 @@ module holasui::dao {
         name: String,
         description: String,
         // initial votes for each nft
-        initial_votes: u64,
+        votes_per_nft: u64,
         // minimum number of nfts voted for a proposal to pass
         quorum: u64,
         // delay since proposal is created until voting start in ms
@@ -107,7 +107,7 @@ module holasui::dao {
         hub: &mut DaoHub,
         name: String,
         description: String,
-        initial_votes: u64,
+        votes_per_nft: u64,
         quorum: u64,
         voting_delay: u64,
         voting_period: u64,
@@ -120,7 +120,7 @@ module holasui::dao {
             version: VERSION,
             name,
             description,
-            initial_votes,
+            votes_per_nft,
             quorum,
             voting_delay,
             voting_period,
