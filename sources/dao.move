@@ -1,5 +1,5 @@
 module holasui::dao {
-    use std::string::String;
+    use std::string::{String, utf8};
 
     use sui::balance::{Self, Balance};
     use sui::clock::{Self, Clock};
@@ -16,11 +16,6 @@ module holasui::dao {
 
     // ======== Constants =========
     const VERSION: u64 = 1;
-
-    // Voting types
-    const VOTE_ABSTAIN: u64 = 0;
-    const VOTE_FOR: u64 = 1;
-    const VOTE_AGAINST: u64 = 2;
 
     // ======== Errors =========
     const EWrongVersion: u64 = 0;
@@ -67,8 +62,8 @@ module holasui::dao {
         start_time: u64,
         end_time: u64,
         // for, against, abstain
-        results: VecMap<u64, u64>,
-        nft_votes: Table<ID, u64>,
+        results: VecMap<String, u64>,
+        nft_votes: Table<ID, bool>,
         address_votes: Table<address, u64>
     }
 
@@ -144,11 +139,11 @@ module holasui::dao {
     ) {
         check_dao_version(dao);
 
-        let results = vec_map::empty<u64, u64>();
+        let results = vec_map::empty<String, u64>();
 
-        vec_map::insert(&mut results, VOTE_FOR, 0);
-        vec_map::insert(&mut results, VOTE_AGAINST, 0);
-        vec_map::insert(&mut results, VOTE_ABSTAIN, 0);
+        vec_map::insert(&mut results, VOTE_FOR(), 0);
+        vec_map::insert(&mut results, VOTE_AGAINST(), 0);
+        vec_map::insert(&mut results, VOTE_ABSTAIN(), 0);
 
         let proposal = Proposal {
             id: object::new(ctx),
@@ -177,13 +172,13 @@ module holasui::dao {
         dao: &mut Dao<T>,
         nft: &T,
         proposal_id: ID,
-        vote: u64,
+        vote: String,
         clock: &Clock,
         ctx: &mut TxContext
     ) {
         check_dao_version(dao);
 
-        assert!(vote == VOTE_FOR || vote == VOTE_AGAINST || vote == VOTE_ABSTAIN, EWrongVoteType);
+        assert!(vote == VOTE_FOR() || vote == VOTE_AGAINST() || vote == VOTE_ABSTAIN(), EWrongVoteType);
 
         let proposal = table::borrow_mut(&mut dao.proposals, proposal_id);
 
@@ -197,8 +192,14 @@ module holasui::dao {
         let current_votes = vec_map::get_mut(&mut proposal.results, &vote) ;
         *current_votes = *current_votes + 1;
 
-        table::add(&mut proposal.nft_votes, nft_id, 1);
-        table::add(&mut proposal.address_votes, sender(ctx), 1);
+        table::add(&mut proposal.nft_votes, nft_id, true);
+
+        if (table::contains(&proposal.address_votes, sender(ctx))) {
+            let current_address_vote = table::borrow_mut(&mut proposal.address_votes, sender(ctx));
+            *current_address_vote = *current_address_vote + 1;
+        } else {
+            table::add(&mut proposal.address_votes, sender(ctx), 1);
+        };
     }
 
     // ======== User functions =========
@@ -212,5 +213,17 @@ module holasui::dao {
 
     fun check_dao_version<T: key + store>(dao: &Dao<T>) {
         assert!(dao.version == VERSION, EWrongVersion);
+    }
+
+    fun VOTE_FOR(): String {
+        utf8(b"For")
+    }
+
+    fun VOTE_AGAINST(): String {
+        utf8(b"Against")
+    }
+
+    fun VOTE_ABSTAIN(): String {
+        utf8(b"Abstain")
     }
 }
