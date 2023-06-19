@@ -27,6 +27,8 @@ module holasui::dao {
     const ENotUpgrade: u64 = 1;
     const EVotingNotStarted: u64 = 2;
     const EVotingEnded: u64 = 3;
+    const EAlreadyVoted: u64 = 4;
+    const EWrongVoteType: u64 = 5;
 
     // ======== Types =========
     struct DAO has drop {}
@@ -169,6 +171,34 @@ module holasui::dao {
         });
 
         table::add(&mut dao.proposals, object::id(&proposal), proposal);
+    }
+
+    public fun vote<T: key + store>(
+        dao: &mut Dao<T>,
+        nft: &T,
+        proposal_id: ID,
+        vote: u64,
+        clock: &Clock,
+        ctx: &mut TxContext
+    ) {
+        check_dao_version(dao);
+
+        assert!(vote == VOTE_FOR || vote == VOTE_AGAINST || vote == VOTE_ABSTAIN, EWrongVoteType);
+
+        let proposal = table::borrow_mut(&mut dao.proposals, proposal_id);
+
+        assert!(clock::timestamp_ms(clock) >= proposal.start_time, EVotingNotStarted);
+        assert!(clock::timestamp_ms(clock) <= proposal.end_time, EVotingEnded);
+
+        let nft_id = object::id(nft);
+
+        assert!(!table::contains(&proposal.nft_votes, nft_id), EAlreadyVoted);
+
+        let current_votes = vec_map::get_mut(&mut proposal.results, &vote) ;
+        *current_votes = *current_votes + 1;
+
+        table::add(&mut proposal.nft_votes, nft_id, 1);
+        table::add(&mut proposal.address_votes, sender(ctx), 1);
     }
 
     // ======== User functions =========
