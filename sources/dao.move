@@ -64,7 +64,8 @@ module holasui::dao {
         // for, against, abstain
         results: VecMap<String, u64>,
         nft_votes: Table<ID, bool>,
-        address_votes: Table<address, u64>
+        address_votes: Table<address, u64>,
+        address_vote_types: Table<address, String>
     }
 
     // ======== Events =========
@@ -73,6 +74,13 @@ module holasui::dao {
         id: ID,
         name: String,
         creator: address,
+    }
+
+    struct Voted has copy, drop {
+        dao_id: ID,
+        proposal_id: ID,
+        voter: address,
+        vote: String
     }
 
     // ======== Functions =========
@@ -156,7 +164,8 @@ module holasui::dao {
             // for, against, abstain
             results,
             nft_votes: table::new(ctx),
-            address_votes: table::new(ctx)
+            address_votes: table::new(ctx),
+            address_vote_types: table::new(ctx)
         };
 
         emit(ProposalCreated {
@@ -178,16 +187,22 @@ module holasui::dao {
     ) {
         check_dao_version(dao);
 
-        assert!(vote == VOTE_FOR() || vote == VOTE_AGAINST() || vote == VOTE_ABSTAIN(), EWrongVoteType);
-
+        let nft_id = object::id(nft);
         let proposal = table::borrow_mut(&mut dao.proposals, proposal_id);
-
         assert!(clock::timestamp_ms(clock) >= proposal.start_time, EVotingNotStarted);
         assert!(clock::timestamp_ms(clock) <= proposal.end_time, EVotingEnded);
-
-        let nft_id = object::id(nft);
-
         assert!(!table::contains(&proposal.nft_votes, nft_id), EAlreadyVoted);
+        assert!(vote == VOTE_FOR() || vote == VOTE_AGAINST() || vote == VOTE_ABSTAIN(), EWrongVoteType);
+        if (table::contains(&proposal.address_vote_types, sender(ctx))) {
+            assert!(*table::borrow(&proposal.address_vote_types, sender(ctx)) == vote, EWrongVoteType);
+        };
+
+        emit(Voted {
+            dao_id: object::uid_to_inner(&dao.id),
+            proposal_id,
+            voter: sender(ctx),
+            vote
+        });
 
         let current_votes = vec_map::get_mut(&mut proposal.results, &vote) ;
         *current_votes = *current_votes + 1;
@@ -199,6 +214,10 @@ module holasui::dao {
             *current_address_vote = *current_address_vote + 1;
         } else {
             table::add(&mut proposal.address_votes, sender(ctx), 1);
+        };
+
+        if (!table::contains(&proposal.address_vote_types, sender(ctx))) {
+            table::add(&mut proposal.address_vote_types, sender(ctx), vote);
         };
     }
 
