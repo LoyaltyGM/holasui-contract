@@ -25,6 +25,8 @@ module holasui::dao {
     // ======== Errors =========
     const EWrongVersion: u64 = 0;
     const ENotUpgrade: u64 = 1;
+    const EVotingNotStarted: u64 = 2;
+    const EVotingEnded: u64 = 3;
 
     // ======== Types =========
     struct DAO has drop {}
@@ -35,7 +37,7 @@ module holasui::dao {
         daos: TableVec<ID>
     }
 
-    struct Dao<phantom T> has key {
+    struct Dao<phantom T: key + store> has key {
         id: UID,
         version: u64,
         name: String,
@@ -94,13 +96,13 @@ module holasui::dao {
         hub.version = VERSION;
     }
 
-    entry fun migrate_dao<T>(_: &AdminCap, dao: &mut Dao<T>) {
+    entry fun migrate_dao<T: key + store>(_: &AdminCap, dao: &mut Dao<T>) {
         assert!(dao.version < VERSION, ENotUpgrade);
 
         dao.version = VERSION;
     }
 
-    entry fun create_dao<T>(
+    entry fun create_dao<T: key + store>(
         _: &AdminCap,
         hub: &mut DaoHub,
         name: String,
@@ -129,7 +131,7 @@ module holasui::dao {
         share_object(dao);
     }
 
-    public fun create_proposal<T>(
+    public fun create_proposal<T: key + store>(
         dao: &mut Dao<T>,
         _: &T,
         name: String,
@@ -178,7 +180,7 @@ module holasui::dao {
         assert!(hub.version == VERSION, EWrongVersion);
     }
 
-    fun check_dao_version<T>(dao: &Dao<T>) {
+    fun check_dao_version<T: key + store>(dao: &Dao<T>) {
         assert!(dao.version == VERSION, EWrongVersion);
     }
 }
