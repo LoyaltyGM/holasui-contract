@@ -23,12 +23,10 @@ module holasui::dao {
     const VOTE_AGAINST: u64 = 2;
 
     // Proposal status
-    // pending, active, canceled, defeated, executed
-    const PROPOSAL_PENDING: u64 = 0;
-    const PROPOSAL_ACTIVE: u64 = 1;
-    const PROPOSAL_CANCELED: u64 = 2;
-    const PROPOSAL_DEFEATED: u64 = 3;
-    const PROPOSAL_EXECUTED: u64 = 4;
+    const PROPOSAL_ACTIVE: u64 = 0;
+    const PROPOSAL_CANCELED: u64 = 1;
+    const PROPOSAL_DEFEATED: u64 = 2;
+    const PROPOSAL_EXECUTED: u64 = 3;
 
     // ======== Errors =========
     const EWrongVersion: u64 = 0;
@@ -37,6 +35,8 @@ module holasui::dao {
     const EVotingEnded: u64 = 3;
     const EAlreadyVoted: u64 = 4;
     const EWrongVoteType: u64 = 5;
+    const ENotProposalCreator: u64 = 6;
+    const EProposalNotActive: u64 = 7;
 
     // ======== Types =========
     struct DAO has drop {}
@@ -175,7 +175,7 @@ module holasui::dao {
             name,
             description,
             type,
-            status: PROPOSAL_PENDING,
+            status: PROPOSAL_ACTIVE,
             creator: sender(ctx),
             start_time: clock::timestamp_ms(clock) + dao.voting_delay,
             end_time: clock::timestamp_ms(clock) + dao.voting_delay + dao.voting_period,
@@ -195,6 +195,22 @@ module holasui::dao {
         table::add(&mut dao.proposals, object::id(&proposal), proposal);
     }
 
+    public fun cancel_proposal<T: key + store>(
+        dao: &mut Dao<T>,
+        proposal_id: ID,
+        clock: &Clock,
+        ctx: &mut TxContext
+    ) {
+        check_dao_version(dao);
+
+        let proposal = table::borrow_mut(&mut dao.proposals, proposal_id);
+        assert!(proposal.creator == sender(ctx), ENotProposalCreator);
+        assert!(proposal.status == PROPOSAL_ACTIVE, EProposalNotActive);
+        assert!(clock::timestamp_ms(clock) < proposal.start_time, EVotingNotStarted);
+
+        proposal.status = PROPOSAL_CANCELED;
+    }
+
     public fun vote<T: key + store>(
         dao: &mut Dao<T>,
         nft: &T,
@@ -207,6 +223,7 @@ module holasui::dao {
 
         let nft_id = object::id(nft);
         let proposal = table::borrow_mut(&mut dao.proposals, proposal_id);
+        assert!(proposal.status == PROPOSAL_ACTIVE, EProposalNotActive);
         assert!(clock::timestamp_ms(clock) >= proposal.start_time, EVotingNotStarted);
         assert!(clock::timestamp_ms(clock) <= proposal.end_time, EVotingEnded);
         assert!(!table::contains(&proposal.nft_votes, nft_id), EAlreadyVoted);
@@ -221,11 +238,6 @@ module holasui::dao {
             voter: sender(ctx),
             vote
         });
-
-        // change status to active if it's pending. called only once
-        if (proposal.status == PROPOSAL_PENDING) {
-            proposal.status = PROPOSAL_ACTIVE;
-        };
 
         // update results with selected vote type
         let current_votes = vec_map::get_mut(&mut proposal.results, &vote) ;
