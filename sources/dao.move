@@ -24,6 +24,11 @@ module holasui::dao {
 
     // Proposal status
     // pending, active, canceled, defeated, executed
+    const PROPOSAL_PENDING: u64 = 0;
+    const PROPOSAL_ACTIVE: u64 = 1;
+    const PROPOSAL_CANCELED: u64 = 2;
+    const PROPOSAL_DEFEATED: u64 = 3;
+    const PROPOSAL_EXECUTED: u64 = 4;
 
     // ======== Errors =========
     const EWrongVersion: u64 = 0;
@@ -66,6 +71,7 @@ module holasui::dao {
         name: String,
         description: String,
         type: String,
+        status: u64,
         creator: address,
         start_time: u64,
         end_time: u64,
@@ -169,6 +175,7 @@ module holasui::dao {
             name,
             description,
             type,
+            status: PROPOSAL_PENDING,
             creator: sender(ctx),
             start_time: clock::timestamp_ms(clock) + dao.voting_delay,
             end_time: clock::timestamp_ms(clock) + dao.voting_delay + dao.voting_period,
@@ -215,11 +222,19 @@ module holasui::dao {
             vote
         });
 
+        // change status to active if it's pending. called only once
+        if (proposal.status == PROPOSAL_PENDING) {
+            proposal.status = PROPOSAL_ACTIVE;
+        };
+
+        // update results with selected vote type
         let current_votes = vec_map::get_mut(&mut proposal.results, &vote) ;
         *current_votes = *current_votes + 1;
 
+        // add nft to voted nfts to prevent double voting with same nft
         table::add(&mut proposal.nft_votes, nft_id, true);
 
+        // count address votes. if address already voted, just increment vote count
         if (table::contains(&proposal.address_votes, sender(ctx))) {
             let current_address_vote = table::borrow_mut(&mut proposal.address_votes, sender(ctx));
             *current_address_vote = *current_address_vote + 1;
@@ -227,6 +242,7 @@ module holasui::dao {
             table::add(&mut proposal.address_votes, sender(ctx), 1);
         };
 
+        // add address to address_vote_types to prevent voting with different vote type
         if (!table::contains(&proposal.address_vote_types, sender(ctx))) {
             table::add(&mut proposal.address_vote_types, sender(ctx), vote);
         };
