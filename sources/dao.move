@@ -33,10 +33,12 @@ module holasui::dao {
     const ENotUpgrade: u64 = 1;
     const EVotingNotStarted: u64 = 2;
     const EVotingEnded: u64 = 3;
-    const EAlreadyVoted: u64 = 4;
-    const EWrongVoteType: u64 = 5;
-    const ENotProposalCreator: u64 = 6;
-    const EProposalNotActive: u64 = 7;
+    const EVotingStarted: u64 = 4;
+    const EVotingNotEnded: u64 = 5;
+    const EAlreadyVoted: u64 = 6;
+    const EWrongVoteType: u64 = 7;
+    const ENotProposalCreator: u64 = 8;
+    const EProposalNotActive: u64 = 9;
 
     // ======== Types =========
     struct DAO has drop {}
@@ -90,12 +92,29 @@ module holasui::dao {
         creator: address,
     }
 
+    struct ProposalCanceled has copy, drop {
+        id: ID,
+        name: String,
+        creator: address,
+    }
+
     struct Voted has copy, drop {
         dao_id: ID,
         proposal_id: ID,
         voter: address,
         vote: u64
     }
+
+    struct ProposalExecuted has copy, drop {
+        id: ID,
+        name: String,
+    }
+
+    struct ProposalDefeated has copy, drop {
+        id: ID,
+        name: String,
+    }
+
 
     // ======== Functions =========
 
@@ -206,7 +225,7 @@ module holasui::dao {
         let proposal = table::borrow_mut(&mut dao.proposals, proposal_id);
         assert!(proposal.creator == sender(ctx), ENotProposalCreator);
         assert!(proposal.status == PROPOSAL_ACTIVE, EProposalNotActive);
-        assert!(clock::timestamp_ms(clock) < proposal.start_time, EVotingNotStarted);
+        assert!(clock::timestamp_ms(clock) < proposal.start_time, EVotingStarted);
 
         proposal.status = PROPOSAL_CANCELED;
     }
@@ -257,6 +276,47 @@ module holasui::dao {
         // add address to address_vote_types to prevent voting with different vote type
         if (!table::contains(&proposal.address_vote_types, sender(ctx))) {
             table::add(&mut proposal.address_vote_types, sender(ctx), vote);
+        };
+    }
+
+    public fun execute_proposal<T: key + store>(
+        dao: &mut Dao<T>,
+        proposal_id: ID,
+        clock: &Clock,
+    ) {
+        check_dao_version(dao);
+
+        let proposal = table::borrow_mut(&mut dao.proposals, proposal_id);
+        assert!(proposal.status == PROPOSAL_ACTIVE, EProposalNotActive);
+        assert!(clock::timestamp_ms(clock) >= proposal.end_time, EVotingNotEnded);
+
+        let results = proposal.results;
+        let votes_for = *vec_map::get(&results, &VOTE_FOR);
+        let votes_against = *vec_map::get(&results, &VOTE_AGAINST);
+        let votes_abstain = *vec_map::get(&results, &VOTE_ABSTAIN);
+        let total_votes = votes_for + votes_against + votes_abstain;
+
+
+        if (total_votes < dao.quorum) {
+            proposal.status = PROPOSAL_DEFEATED;
+            emit(ProposalDefeated {
+                id: proposal_id,
+                name: proposal.name
+            });
+        } else {
+            if (votes_for > votes_against) {
+                proposal.status = PROPOSAL_EXECUTED;
+                emit(ProposalExecuted {
+                    id: proposal_id,
+                    name: proposal.name
+                });
+            } else {
+                proposal.status = PROPOSAL_DEFEATED;
+                emit(ProposalDefeated {
+                    id: proposal_id,
+                    name: proposal.name
+                });
+            }
         };
     }
 
