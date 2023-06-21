@@ -1,5 +1,5 @@
 module holasui::dao {
-    use std::string::{String, utf8};
+    use std::string::String;
 
     use sui::balance::{Self, Balance};
     use sui::clock::{Self, Clock};
@@ -16,6 +16,14 @@ module holasui::dao {
 
     // ======== Constants =========
     const VERSION: u64 = 1;
+
+    // Vote types
+    const VOTE_ABSTAIN: u64 = 0;
+    const VOTE_FOR: u64 = 1;
+    const VOTE_AGAINST: u64 = 2;
+
+    // Proposal status
+    // pending, active, canceled, defeated, executed
 
     // ======== Errors =========
     const EWrongVersion: u64 = 0;
@@ -62,10 +70,10 @@ module holasui::dao {
         start_time: u64,
         end_time: u64,
         // for, against, abstain
-        results: VecMap<String, u64>,
+        results: VecMap<u64, u64>,
         nft_votes: Table<ID, bool>,
         address_votes: Table<address, u64>,
-        address_vote_types: Table<address, String>
+        address_vote_types: Table<address, u64>
     }
 
     // ======== Events =========
@@ -80,7 +88,7 @@ module holasui::dao {
         dao_id: ID,
         proposal_id: ID,
         voter: address,
-        vote: String
+        vote: u64
     }
 
     // ======== Functions =========
@@ -136,6 +144,9 @@ module holasui::dao {
         share_object(dao);
     }
 
+    // ======== User functions =========
+
+
     public fun create_proposal<T: key + store>(
         dao: &mut Dao<T>,
         _: &T,
@@ -147,11 +158,11 @@ module holasui::dao {
     ) {
         check_dao_version(dao);
 
-        let results = vec_map::empty<String, u64>();
+        let results = vec_map::empty<u64, u64>();
 
-        vec_map::insert(&mut results, VOTE_FOR(), 0);
-        vec_map::insert(&mut results, VOTE_AGAINST(), 0);
-        vec_map::insert(&mut results, VOTE_ABSTAIN(), 0);
+        vec_map::insert(&mut results, VOTE_FOR, 0);
+        vec_map::insert(&mut results, VOTE_AGAINST, 0);
+        vec_map::insert(&mut results, VOTE_ABSTAIN, 0);
 
         let proposal = Proposal {
             id: object::new(ctx),
@@ -181,7 +192,7 @@ module holasui::dao {
         dao: &mut Dao<T>,
         nft: &T,
         proposal_id: ID,
-        vote: String,
+        vote: u64,
         clock: &Clock,
         ctx: &mut TxContext
     ) {
@@ -192,7 +203,7 @@ module holasui::dao {
         assert!(clock::timestamp_ms(clock) >= proposal.start_time, EVotingNotStarted);
         assert!(clock::timestamp_ms(clock) <= proposal.end_time, EVotingEnded);
         assert!(!table::contains(&proposal.nft_votes, nft_id), EAlreadyVoted);
-        assert!(vote == VOTE_FOR() || vote == VOTE_AGAINST() || vote == VOTE_ABSTAIN(), EWrongVoteType);
+        assert!(vote == VOTE_FOR || vote == VOTE_AGAINST || vote == VOTE_ABSTAIN, EWrongVoteType);
         if (table::contains(&proposal.address_vote_types, sender(ctx))) {
             assert!(*table::borrow(&proposal.address_vote_types, sender(ctx)) == vote, EWrongVoteType);
         };
@@ -221,9 +232,6 @@ module holasui::dao {
         };
     }
 
-    // ======== User functions =========
-
-
     // ======== Utility functions =========
 
     fun check_hub_version(hub: &DaoHub) {
@@ -232,17 +240,5 @@ module holasui::dao {
 
     fun check_dao_version<T: key + store>(dao: &Dao<T>) {
         assert!(dao.version == VERSION, EWrongVersion);
-    }
-
-    fun VOTE_FOR(): String {
-        utf8(b"For")
-    }
-
-    fun VOTE_AGAINST(): String {
-        utf8(b"Against")
-    }
-
-    fun VOTE_ABSTAIN(): String {
-        utf8(b"Abstain")
     }
 }
