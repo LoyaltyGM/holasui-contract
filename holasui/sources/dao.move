@@ -1,4 +1,5 @@
 module holasui::dao {
+    use std::option::{Self, Option};
     use std::string::String;
 
     use sui::balance::{Self, Balance};
@@ -52,6 +53,7 @@ module holasui::dao {
     struct Dao<phantom T: key + store> has key {
         id: UID,
         version: u64,
+        attribute: Option<String>,
         name: String,
         description: String,
         // initial votes for each nft
@@ -156,6 +158,7 @@ module holasui::dao {
         let dao = Dao<T> {
             id: object::new(ctx),
             version: VERSION,
+            attribute: option::none(),
             name,
             description,
             // votes_per_nft,
