@@ -1,5 +1,4 @@
-module holasui::dao {
-    use std::option::{Self, Option};
+module holasui::suifren_dao {
     use std::string::String;
 
     use sui::balance::{Self, Balance};
@@ -12,6 +11,7 @@ module holasui::dao {
     use sui::transfer::share_object;
     use sui::tx_context::{TxContext, sender};
     use sui::vec_map::{Self, VecMap};
+    use suifrens::suifrens::{Self, SuiFren};
 
     use holasui::staking::AdminCap;
 
@@ -40,9 +40,10 @@ module holasui::dao {
     const EWrongVoteType: u64 = 7;
     const ENotProposalCreator: u64 = 8;
     const EProposalNotActive: u64 = 9;
+    const EWrongBirthLocation: u64 = 10;
 
     // ======== Types =========
-    struct DAO has drop {}
+    struct SUIFREN_DAO has drop {}
 
     struct DaoHub has key {
         id: UID,
@@ -53,11 +54,9 @@ module holasui::dao {
     struct Dao<phantom T: key + store> has key {
         id: UID,
         version: u64,
-        attribute: Option<String>,
+        birth_location: String,
         name: String,
         description: String,
-        // initial votes for each nft
-        // votes_per_nft: u64,
         // minimum number of nfts voted for a proposal to pass
         quorum: u64,
         // delay since proposal is created until voting start in ms
@@ -120,7 +119,7 @@ module holasui::dao {
 
     // ======== Functions =========
 
-    fun init(_: DAO, ctx: &mut TxContext) {
+    fun init(_: SUIFREN_DAO, ctx: &mut TxContext) {
         share_object(DaoHub {
             id: object::new(ctx),
             version: VERSION,
@@ -145,9 +144,9 @@ module holasui::dao {
     entry fun create_dao<T: key + store>(
         _: &AdminCap,
         hub: &mut DaoHub,
+        birth_location: String,
         name: String,
         description: String,
-        // votes_per_nft: u64,
         quorum: u64,
         voting_delay: u64,
         voting_period: u64,
@@ -158,7 +157,7 @@ module holasui::dao {
         let dao = Dao<T> {
             id: object::new(ctx),
             version: VERSION,
-            attribute: option::none(),
+            birth_location,
             name,
             description,
             // votes_per_nft,
@@ -175,9 +174,9 @@ module holasui::dao {
     // ======== User functions =========
 
 
-    public fun create_proposal<T: key + store>(
+    entry fun create_proposal<T: key + store>(
         dao: &mut Dao<T>,
-        _: &T,
+        fren: &SuiFren<T>,
         name: String,
         description: String,
         type: String,
@@ -185,6 +184,7 @@ module holasui::dao {
         ctx: &mut TxContext
     ) {
         check_dao_version(dao);
+        assert!(dao.birth_location == suifrens::birth_location(fren), EWrongBirthLocation);
 
         let results = vec_map::empty<u64, u64>();
 
@@ -217,7 +217,7 @@ module holasui::dao {
         table::add(&mut dao.proposals, object::id(&proposal), proposal);
     }
 
-    public fun cancel_proposal<T: key + store>(
+    entry fun cancel_proposal<T: key + store>(
         dao: &mut Dao<T>,
         proposal_id: ID,
         clock: &Clock,
@@ -233,17 +233,18 @@ module holasui::dao {
         proposal.status = PROPOSAL_CANCELED;
     }
 
-    public fun vote<T: key + store>(
+    entry fun vote<T: key + store>(
         dao: &mut Dao<T>,
-        nft: &T,
+        fren: &SuiFren<T>,
         proposal_id: ID,
         vote: u64,
         clock: &Clock,
         ctx: &mut TxContext
     ) {
         check_dao_version(dao);
+        assert!(dao.birth_location == suifrens::birth_location(fren), EWrongBirthLocation);
 
-        let nft_id = object::id(nft);
+        let nft_id = object::id(fren);
         let proposal = table::borrow_mut(&mut dao.proposals, proposal_id);
         assert!(proposal.status == PROPOSAL_ACTIVE, EProposalNotActive);
         assert!(clock::timestamp_ms(clock) >= proposal.start_time, EVotingNotStarted);
@@ -282,7 +283,7 @@ module holasui::dao {
         };
     }
 
-    public fun execute_proposal<T: key + store>(
+    entry fun execute_proposal<T: key + store>(
         dao: &mut Dao<T>,
         proposal_id: ID,
         clock: &Clock,
