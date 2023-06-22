@@ -1,3 +1,9 @@
+/*
+    Example of creating a DAO by attribute of a NFT
+    In this example, a DAO can be created by a SuiFren birth location attribute
+    So only SuiFrens with the same birth location can participate in the DAO
+*/
+
 module holasui::suifren_dao {
     use std::string::String;
 
