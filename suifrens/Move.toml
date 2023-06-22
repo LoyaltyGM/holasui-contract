@@ -3,8 +3,11 @@ name = "suifrens"
 version = "0.0.1"
 published-at = "0xee496a0cc04d06a345982ba6697c90c619020de9e274408c7819f787ff66e1a1"
 
-[dependencies]
-Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "4c9993fa0" }
+[dependencies.Sui]
+git = "https://github.com/MystenLabs/sui.git"
+subdir = "crates/sui-framework/packages/sui-framework"
+# mainnet-1.3.1
+rev = "a2af559f9ea21e09ca7e377e3b477fc2b5239fc7"
 
 [addresses]
 suifrens = "0xee496a0cc04d06a345982ba6697c90c619020de9e274408c7819f787ff66e1a1"
