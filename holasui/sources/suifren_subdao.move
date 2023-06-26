@@ -4,7 +4,9 @@
     So only SuiFrens with the same birth location can participate in the DAO
 */
 
-module holasui::suifren_dao {
+module holasui::suifren_subdao {
+    use std::ascii::string;
+    use std::string;
     use std::string::String;
 
     use sui::balance::{Self, Balance};
@@ -16,6 +18,8 @@ module holasui::suifren_dao {
     use sui::table_vec::{Self, TableVec};
     use sui::transfer::share_object;
     use sui::tx_context::{TxContext, sender};
+    use sui::url;
+    use sui::url::Url;
     use sui::vec_map::{Self, VecMap};
     use suifrens::suifrens::{Self, SuiFren};
 
@@ -63,6 +67,7 @@ module holasui::suifren_dao {
         birth_location: String,
         name: String,
         description: String,
+        image: Url,
         // minimum number of nfts voted for a proposal to pass
         quorum: u64,
         // delay since proposal is created until voting start in ms
@@ -153,6 +158,7 @@ module holasui::suifren_dao {
         birth_location: String,
         name: String,
         description: String,
+        image: String,
         quorum: u64,
         voting_delay: u64,
         voting_period: u64,
@@ -166,6 +172,7 @@ module holasui::suifren_dao {
             birth_location,
             name,
             description,
+            image: url::new_unsafe(string::to_ascii(image)),
             // votes_per_nft,
             quorum,
             voting_delay,
