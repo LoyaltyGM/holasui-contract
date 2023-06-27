@@ -22,6 +22,8 @@ module holasui::suifren_subdao {
     use suifrens::suifrens::{Self, SuiFren};
 
     use holasui::staking::AdminCap;
+    use holasui::suifren_dao;
+    use holasui::suifren_dao::Dao;
 
     // ======== Constants =========
 
@@ -50,8 +52,9 @@ module holasui::suifren_subdao {
     // ======== Types =========
     struct SUIFREN_SUBDAO has drop {}
 
-    struct Dao<phantom T: key + store> has key {
+    struct SubDao<phantom T: key + store> has key {
         id: UID,
+        origin_dao: ID,
         birth_location: String,
         name: String,
         description: String,
@@ -118,8 +121,9 @@ module holasui::suifren_subdao {
 
     // ======== Admin functions =========
 
-    entry fun create_dao<T: key + store>(
+    entry fun create_subdao<T: key + store>(
         _: &AdminCap,
+        dao: &mut Dao<T>,
         birth_location: String,
         name: String,
         description: String,
@@ -129,13 +133,13 @@ module holasui::suifren_subdao {
         voting_period: u64,
         ctx: &mut TxContext
     ) {
-        let dao = Dao<T> {
+        let subdao = SubDao<T> {
             id: object::new(ctx),
+            origin_dao: object::id(dao),
             birth_location,
             name,
             description,
             image: url::new_unsafe(string::to_ascii(image)),
-            // votes_per_nft,
             quorum,
             voting_delay,
             voting_period,
@@ -143,14 +147,15 @@ module holasui::suifren_subdao {
             proposals: table::new(ctx)
         };
 
-        share_object(dao);
+        suifren_dao::update_subdaos(dao, object::id(&subdao));
+        share_object(subdao);
     }
 
     // ======== User functions =========
 
 
     entry fun create_proposal<T: key + store>(
-        dao: &mut Dao<T>,
+        dao: &mut SubDao<T>,
         fren: &SuiFren<T>,
         name: String,
         description: String,
@@ -192,7 +197,7 @@ module holasui::suifren_subdao {
     }
 
     entry fun cancel_proposal<T: key + store>(
-        dao: &mut Dao<T>,
+        dao: &mut SubDao<T>,
         proposal_id: ID,
         clock: &Clock,
         ctx: &mut TxContext
@@ -206,7 +211,7 @@ module holasui::suifren_subdao {
     }
 
     entry fun vote<T: key + store>(
-        dao: &mut Dao<T>,
+        dao: &mut SubDao<T>,
         fren: &SuiFren<T>,
         proposal_id: ID,
         vote: u64,
@@ -255,7 +260,7 @@ module holasui::suifren_subdao {
     }
 
     entry fun execute_proposal<T: key + store>(
-        dao: &mut Dao<T>,
+        dao: &mut SubDao<T>,
         proposal_id: ID,
         clock: &Clock,
     ) {
