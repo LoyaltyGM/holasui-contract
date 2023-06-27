@@ -156,7 +156,7 @@ module holasui::suifren_subdao {
     }
 
     public fun create_proposal<T: key + store>(
-        dao: &mut SubDao<T>,
+        subdao: &mut SubDao<T>,
         fren: &SuiFren<T>,
         name: String,
         description: String,
@@ -166,7 +166,7 @@ module holasui::suifren_subdao {
         clock: &Clock,
         ctx: &mut TxContext
     ) {
-        assert!(dao.birth_location == suifrens::birth_location(fren), EWrongBirthLocation);
+        assert!(subdao.birth_location == suifrens::birth_location(fren), EWrongBirthLocation);
 
         assert!(type == PROPOSAL_TYPE_VOTING || type == PROPOSAL_TYPE_FUNDING, EWrongProposalType);
 
@@ -194,8 +194,8 @@ module holasui::suifren_subdao {
             amount,
             status: PROPOSAL_STATUS_ACTIVE,
             creator: sender(ctx),
-            start_time: clock::timestamp_ms(clock) + dao.voting_delay,
-            end_time: clock::timestamp_ms(clock) + dao.voting_delay + dao.voting_period,
+            start_time: clock::timestamp_ms(clock) + subdao.voting_delay,
+            end_time: clock::timestamp_ms(clock) + subdao.voting_delay + subdao.voting_period,
             // for, against, abstain
             results,
             nft_votes: table::new(ctx),
@@ -209,16 +209,16 @@ module holasui::suifren_subdao {
             creator: proposal.creator
         });
 
-        table::add(&mut dao.proposals, object::id(&proposal), proposal);
+        table::add(&mut subdao.proposals, object::id(&proposal), proposal);
     }
 
     entry fun cancel_proposal<T: key + store>(
-        dao: &mut SubDao<T>,
+        subdao: &mut SubDao<T>,
         proposal_id: ID,
         clock: &Clock,
         ctx: &mut TxContext
     ) {
-        let proposal = table::borrow_mut(&mut dao.proposals, proposal_id);
+        let proposal = table::borrow_mut(&mut subdao.proposals, proposal_id);
         assert!(proposal.creator == sender(ctx), ENotProposalCreator);
         assert!(proposal.status == PROPOSAL_STATUS_ACTIVE, EProposalNotActive);
         assert!(clock::timestamp_ms(clock) < proposal.start_time, EVotingStarted);
@@ -227,17 +227,17 @@ module holasui::suifren_subdao {
     }
 
     entry fun vote<T: key + store>(
-        dao: &mut SubDao<T>,
+        subdao: &mut SubDao<T>,
         fren: &SuiFren<T>,
         proposal_id: ID,
         vote: u64,
         clock: &Clock,
         ctx: &mut TxContext
     ) {
-        assert!(dao.birth_location == suifrens::birth_location(fren), EWrongBirthLocation);
+        assert!(subdao.birth_location == suifrens::birth_location(fren), EWrongBirthLocation);
 
         let nft_id = object::id(fren);
-        let proposal = table::borrow_mut(&mut dao.proposals, proposal_id);
+        let proposal = table::borrow_mut(&mut subdao.proposals, proposal_id);
         assert!(proposal.status == PROPOSAL_STATUS_ACTIVE, EProposalNotActive);
         assert!(clock::timestamp_ms(clock) >= proposal.start_time, EVotingNotStarted);
         assert!(clock::timestamp_ms(clock) <= proposal.end_time, EVotingEnded);
@@ -248,7 +248,7 @@ module holasui::suifren_subdao {
         };
 
         emit(Voted {
-            dao_id: object::uid_to_inner(&dao.id),
+            dao_id: object::uid_to_inner(&subdao.id),
             proposal_id,
             voter: sender(ctx),
             vote
@@ -276,12 +276,12 @@ module holasui::suifren_subdao {
     }
 
     entry fun execute_proposal<T: key + store>(
-        dao: &mut SubDao<T>,
+        subdao: &mut SubDao<T>,
         proposal_id: ID,
         clock: &Clock,
         ctx: &mut TxContext
     ) {
-        let proposal = table::borrow_mut(&mut dao.proposals, proposal_id);
+        let proposal = table::borrow_mut(&mut subdao.proposals, proposal_id);
         assert!(proposal.status == PROPOSAL_STATUS_ACTIVE, EProposalNotActive);
         assert!(clock::timestamp_ms(clock) >= proposal.end_time, EVotingNotEnded);
 
@@ -293,7 +293,7 @@ module holasui::suifren_subdao {
 
 
         proposal.status =
-            if (total_votes < dao.quorum) PROPOSAL_STATUS_DEFEATED
+            if (total_votes < subdao.quorum) PROPOSAL_STATUS_DEFEATED
             else {
                 if (votes_for > votes_against) PROPOSAL_STATUS_EXECUTED
                 else PROPOSAL_STATUS_DEFEATED
@@ -309,7 +309,7 @@ module holasui::suifren_subdao {
             let recipient = *option::borrow(&proposal.recipient);
             let amount = *option::borrow(&proposal.amount);
 
-            public_transfer(coin::take(&mut dao.treasury, amount, ctx), recipient);
+            public_transfer(coin::take(&mut subdao.treasury, amount, ctx), recipient);
         }
     }
 
