@@ -5,19 +5,18 @@
 */
 
 module holasui::suifren_subdao {
-    use std::ascii::string;
     use std::string;
     use std::string::String;
 
     use sui::balance::{Self, Balance};
     use sui::clock::{Self, Clock};
     use sui::event::emit;
-    use sui::object::{Self, UID, ID};
+    use sui::object::{Self, ID, UID};
     use sui::sui::SUI;
     use sui::table::{Self, Table};
     use sui::table_vec::{Self, TableVec};
     use sui::transfer::share_object;
-    use sui::tx_context::{TxContext, sender};
+    use sui::tx_context::{sender, TxContext};
     use sui::url;
     use sui::url::Url;
     use sui::vec_map::{Self, VecMap};
@@ -53,7 +52,7 @@ module holasui::suifren_subdao {
     const EWrongBirthLocation: u64 = 10;
 
     // ======== Types =========
-    struct SUIFREN_DAO has drop {}
+    struct SUIFREN_SUBDAO has drop {}
 
     struct DaoHub has key {
         id: UID,
@@ -76,8 +75,6 @@ module holasui::suifren_subdao {
         voting_period: u64,
         treasury: Balance<SUI>,
         proposals: Table<ID, Proposal>,
-
-        // TODO: add delegation
     }
 
     struct Proposal has key, store {
@@ -130,7 +127,7 @@ module holasui::suifren_subdao {
 
     // ======== Functions =========
 
-    fun init(_: SUIFREN_DAO, ctx: &mut TxContext) {
+    fun init(_: SUIFREN_SUBDAO, ctx: &mut TxContext) {
         share_object(DaoHub {
             id: object::new(ctx),
             version: VERSION,
