@@ -125,6 +125,8 @@ module holasui::suifren_subdao {
 
     // ======== Admin functions =========
 
+    // ======== User functions =========
+
     entry fun create_subdao<T: key + store>(
         dao: &mut Dao<T>,
         fren: &SuiFren<T>,
@@ -156,9 +158,6 @@ module holasui::suifren_subdao {
         suifren_dao::update_subdaos(dao, object::id(&subdao));
         share_object(subdao);
     }
-
-    // ======== User functions =========
-
 
     public fun create_proposal<T: key + store>(
         dao: &mut SubDao<T>,

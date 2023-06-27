@@ -53,11 +53,6 @@ module holasui::suifren_dao {
     // ======== Types =========
     struct SUIFREN_DAO has drop {}
 
-    struct DaoHub has key {
-        id: UID,
-        daos: TableVec<ID>
-    }
-
     struct Dao<phantom T: key + store> has key {
         id: UID,
         name: String,
@@ -122,19 +117,10 @@ module holasui::suifren_dao {
 
     // ======== Functions =========
 
-    fun init(_: SUIFREN_DAO, ctx: &mut TxContext) {
-        share_object(DaoHub {
-            id: object::new(ctx),
-            daos: table_vec::empty(ctx)
-        })
-    }
-
     // ======== Admin functions =========
 
     entry fun create_dao<T: key + store>(
-        _: AdminCap,
-        hub: &mut DaoHub,
-        _: &SuiFren<T>,
+        _: &AdminCap,
         name: String,
         description: String,
         image: String,
@@ -156,7 +142,6 @@ module holasui::suifren_dao {
             subdaos: table_vec::empty(ctx),
         };
 
-        table_vec::push_back(&mut hub.daos, object::id(&dao));
         share_object(dao);
     }
 
