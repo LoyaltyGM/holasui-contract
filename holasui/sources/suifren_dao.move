@@ -33,15 +33,15 @@ module holasui::suifren_dao {
     const PROPOSAL_EXECUTED: u64 = 3;
 
     // ======== Errors =========
-    const EVotingNotStarted: u64 = 2;
-    const EVotingEnded: u64 = 3;
-    const EVotingStarted: u64 = 4;
-    const EVotingNotEnded: u64 = 5;
-    const EAlreadyVoted: u64 = 6;
-    const EWrongVoteType: u64 = 7;
-    const ENotProposalCreator: u64 = 8;
-    const EProposalNotActive: u64 = 9;
-    const EWrongBirthLocation: u64 = 10;
+    const EVotingNotStarted: u64 = 0;
+    const EVotingEnded: u64 = 1;
+    const EVotingStarted: u64 = 2;
+    const EVotingNotEnded: u64 = 3;
+    const EAlreadyVoted: u64 = 4;
+    const EWrongVoteType: u64 = 5;
+    const ENotProposalCreator: u64 = 6;
+    const EProposalNotActive: u64 = 7;
+    const EWrongBirthLocation: u64 = 8;
 
     // ======== Types =========
     struct SUIFREN_DAO has drop {}
