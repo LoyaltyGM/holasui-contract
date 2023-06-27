@@ -14,7 +14,6 @@ module holasui::suifren_subdao {
     use sui::object::{Self, ID, UID};
     use sui::sui::SUI;
     use sui::table::{Self, Table};
-    use sui::table_vec::{Self, TableVec};
     use sui::transfer::share_object;
     use sui::tx_context::{sender, TxContext};
     use sui::url;
@@ -50,11 +49,6 @@ module holasui::suifren_subdao {
 
     // ======== Types =========
     struct SUIFREN_SUBDAO has drop {}
-
-    struct DaoHub has key {
-        id: UID,
-        daos: TableVec<ID>
-    }
 
     struct Dao<phantom T: key + store> has key {
         id: UID,
@@ -122,18 +116,10 @@ module holasui::suifren_subdao {
 
     // ======== Functions =========
 
-    fun init(_: SUIFREN_SUBDAO, ctx: &mut TxContext) {
-        share_object(DaoHub {
-            id: object::new(ctx),
-            daos: table_vec::empty(ctx)
-        })
-    }
-
     // ======== Admin functions =========
 
     entry fun create_dao<T: key + store>(
         _: &AdminCap,
-        hub: &mut DaoHub,
         birth_location: String,
         name: String,
         description: String,
