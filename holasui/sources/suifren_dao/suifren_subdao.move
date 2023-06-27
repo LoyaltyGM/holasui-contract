@@ -5,10 +5,8 @@
 */
 
 module holasui::suifren_subdao {
-    use std::option;
-    use std::option::Option;
-    use std::string;
-    use std::string::String;
+    use std::option::{Self, Option};
+    use std::string::{Self, String};
 
     use sui::balance::{Self, Balance};
     use sui::clock::{Self, Clock};
@@ -19,13 +17,11 @@ module holasui::suifren_subdao {
     use sui::table::{Self, Table};
     use sui::transfer::{public_transfer, share_object};
     use sui::tx_context::{sender, TxContext};
-    use sui::url;
-    use sui::url::Url;
+    use sui::url::{Self, Url};
     use sui::vec_map::{Self, VecMap};
     use suifrens::suifrens::{Self, SuiFren};
 
-    use holasui::suifren_dao;
-    use holasui::suifren_dao::Dao;
+    use holasui::suifren_dao::{Self, Dao};
 
     // ======== Constants =========
 

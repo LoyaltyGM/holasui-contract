@@ -1,8 +1,6 @@
 module holasui::suifren_dao {
-    use std::option;
-    use std::option::Option;
-    use std::string;
-    use std::string::String;
+    use std::option::{Self, Option};
+    use std::string::{Self, String};
 
     use sui::balance::{Self, Balance};
     use sui::clock::{Self, Clock};
@@ -14,8 +12,7 @@ module holasui::suifren_dao {
     use sui::table_vec::{Self, TableVec};
     use sui::transfer::{public_transfer, share_object};
     use sui::tx_context::{sender, TxContext};
-    use sui::url;
-    use sui::url::Url;
+    use sui::url::{Self, Url};
     use sui::vec_map::{Self, VecMap};
     use suifrens::suifrens::SuiFren;
 
