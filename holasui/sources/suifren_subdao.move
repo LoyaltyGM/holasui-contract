@@ -25,7 +25,6 @@ module holasui::suifren_subdao {
     use holasui::staking::AdminCap;
 
     // ======== Constants =========
-    const VERSION: u64 = 1;
 
     // Vote types
     const VOTE_ABSTAIN: u64 = 0;
@@ -39,30 +38,26 @@ module holasui::suifren_subdao {
     const PROPOSAL_EXECUTED: u64 = 3;
 
     // ======== Errors =========
-    const EWrongVersion: u64 = 0;
-    const ENotUpgrade: u64 = 1;
-    const EVotingNotStarted: u64 = 2;
-    const EVotingEnded: u64 = 3;
-    const EVotingStarted: u64 = 4;
-    const EVotingNotEnded: u64 = 5;
-    const EAlreadyVoted: u64 = 6;
-    const EWrongVoteType: u64 = 7;
-    const ENotProposalCreator: u64 = 8;
-    const EProposalNotActive: u64 = 9;
-    const EWrongBirthLocation: u64 = 10;
+    const EVotingNotStarted: u64 = 0;
+    const EVotingEnded: u64 = 1;
+    const EVotingStarted: u64 = 2;
+    const EVotingNotEnded: u64 = 3;
+    const EAlreadyVoted: u64 = 4;
+    const EWrongVoteType: u64 = 5;
+    const ENotProposalCreator: u64 = 6;
+    const EProposalNotActive: u64 = 7;
+    const EWrongBirthLocation: u64 = 8;
 
     // ======== Types =========
     struct SUIFREN_SUBDAO has drop {}
 
     struct DaoHub has key {
         id: UID,
-        version: u64,
         daos: TableVec<ID>
     }
 
     struct Dao<phantom T: key + store> has key {
         id: UID,
-        version: u64,
         birth_location: String,
         name: String,
         description: String,
@@ -130,24 +125,11 @@ module holasui::suifren_subdao {
     fun init(_: SUIFREN_SUBDAO, ctx: &mut TxContext) {
         share_object(DaoHub {
             id: object::new(ctx),
-            version: VERSION,
             daos: table_vec::empty(ctx)
         })
     }
 
     // ======== Admin functions =========
-
-    entry fun migrate_hub(_: &AdminCap, hub: &mut DaoHub) {
-        assert!(hub.version < VERSION, ENotUpgrade);
-
-        hub.version = VERSION;
-    }
-
-    entry fun migrate_dao<T: key + store>(_: &AdminCap, dao: &mut Dao<T>) {
-        assert!(dao.version < VERSION, ENotUpgrade);
-
-        dao.version = VERSION;
-    }
 
     entry fun create_dao<T: key + store>(
         _: &AdminCap,
@@ -161,11 +143,8 @@ module holasui::suifren_subdao {
         voting_period: u64,
         ctx: &mut TxContext
     ) {
-        check_hub_version(hub);
-
         let dao = Dao<T> {
             id: object::new(ctx),
-            version: VERSION,
             birth_location,
             name,
             description,
@@ -193,7 +172,6 @@ module holasui::suifren_subdao {
         clock: &Clock,
         ctx: &mut TxContext
     ) {
-        check_dao_version(dao);
         assert!(dao.birth_location == suifrens::birth_location(fren), EWrongBirthLocation);
 
         let results = vec_map::empty<u64, u64>();
@@ -233,8 +211,6 @@ module holasui::suifren_subdao {
         clock: &Clock,
         ctx: &mut TxContext
     ) {
-        check_dao_version(dao);
-
         let proposal = table::borrow_mut(&mut dao.proposals, proposal_id);
         assert!(proposal.creator == sender(ctx), ENotProposalCreator);
         assert!(proposal.status == PROPOSAL_ACTIVE, EProposalNotActive);
@@ -251,7 +227,6 @@ module holasui::suifren_subdao {
         clock: &Clock,
         ctx: &mut TxContext
     ) {
-        check_dao_version(dao);
         assert!(dao.birth_location == suifrens::birth_location(fren), EWrongBirthLocation);
 
         let nft_id = object::id(fren);
@@ -298,8 +273,6 @@ module holasui::suifren_subdao {
         proposal_id: ID,
         clock: &Clock,
     ) {
-        check_dao_version(dao);
-
         let proposal = table::borrow_mut(&mut dao.proposals, proposal_id);
         assert!(proposal.status == PROPOSAL_ACTIVE, EProposalNotActive);
         assert!(clock::timestamp_ms(clock) >= proposal.end_time, EVotingNotEnded);
@@ -335,12 +308,4 @@ module holasui::suifren_subdao {
     }
 
     // ======== Utility functions =========
-
-    fun check_hub_version(hub: &DaoHub) {
-        assert!(hub.version == VERSION, EWrongVersion);
-    }
-
-    fun check_dao_version<T: key + store>(dao: &Dao<T>) {
-        assert!(dao.version == VERSION, EWrongVersion);
-    }
 }
