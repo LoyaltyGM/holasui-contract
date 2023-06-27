@@ -50,7 +50,7 @@ module holasui::suifren_dao {
     // ======== Types =========
     struct SUIFREN_DAO has drop {}
 
-    struct Dao<phantom T: key + store> has key {
+    struct Dao<phantom T> has key {
         id: UID,
         name: String,
         description: String,
@@ -116,7 +116,7 @@ module holasui::suifren_dao {
 
     // ======== Admin functions =========
 
-    entry fun create_dao<T: key + store>(
+    entry fun create_dao<T>(
         _: &AdminCap,
         name: String,
         description: String,
@@ -144,7 +144,7 @@ module holasui::suifren_dao {
 
     // ======== User functions =========
 
-    public fun create_proposal<T: key + store>(
+    public fun create_proposal<T>(
         dao: &mut Dao<T>,
         _: &SuiFren<T>,
         name: String,
@@ -200,7 +200,7 @@ module holasui::suifren_dao {
         table::add(&mut dao.proposals, object::id(&proposal), proposal);
     }
 
-    entry fun cancel_proposal<T: key + store>(
+    entry fun cancel_proposal<T>(
         dao: &mut Dao<T>,
         proposal_id: ID,
         clock: &Clock,
@@ -214,7 +214,7 @@ module holasui::suifren_dao {
         proposal.status = PROPOSAL_STATUS_CANCELED;
     }
 
-    entry fun vote<T: key + store>(
+    entry fun vote<T>(
         dao: &mut Dao<T>,
         fren: &SuiFren<T>,
         proposal_id: ID,
@@ -261,7 +261,7 @@ module holasui::suifren_dao {
         };
     }
 
-    entry fun execute_proposal<T: key + store>(
+    entry fun execute_proposal<T>(
         dao: &mut Dao<T>,
         proposal_id: ID,
         clock: &Clock,
@@ -300,7 +300,7 @@ module holasui::suifren_dao {
     }
 
     // ======== Friend functions =========
-    public(friend) fun update_subdaos<T: key + store>(
+    public(friend) fun update_subdaos<T>(
         dao: &mut Dao<T>,
         subdao: ID,
     ) {

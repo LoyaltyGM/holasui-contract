@@ -55,7 +55,7 @@ module holasui::suifren_subdao {
     // ======== Types =========
     struct SUIFREN_SUBDAO has drop {}
 
-    struct SubDao<phantom T: key + store> has key {
+    struct SubDao<phantom T> has key {
         id: UID,
         origin_dao: ID,
         birth_location: String,
@@ -123,7 +123,7 @@ module holasui::suifren_subdao {
 
     // ======== User functions =========
 
-    entry fun create_subdao<T: key + store>(
+    entry fun create_subdao<T>(
         dao: &mut Dao<T>,
         fren: &SuiFren<T>,
         birth_location: String,
@@ -155,7 +155,7 @@ module holasui::suifren_subdao {
         share_object(subdao);
     }
 
-    public fun create_proposal<T: key + store>(
+    public fun create_proposal<T>(
         subdao: &mut SubDao<T>,
         fren: &SuiFren<T>,
         name: String,
@@ -212,7 +212,7 @@ module holasui::suifren_subdao {
         table::add(&mut subdao.proposals, object::id(&proposal), proposal);
     }
 
-    entry fun cancel_proposal<T: key + store>(
+    entry fun cancel_proposal<T>(
         subdao: &mut SubDao<T>,
         proposal_id: ID,
         clock: &Clock,
@@ -226,7 +226,7 @@ module holasui::suifren_subdao {
         proposal.status = PROPOSAL_STATUS_CANCELED;
     }
 
-    entry fun vote<T: key + store>(
+    entry fun vote<T>(
         subdao: &mut SubDao<T>,
         fren: &SuiFren<T>,
         proposal_id: ID,
@@ -275,7 +275,7 @@ module holasui::suifren_subdao {
         };
     }
 
-    entry fun execute_proposal<T: key + store>(
+    entry fun execute_proposal<T>(
         subdao: &mut SubDao<T>,
         proposal_id: ID,
         clock: &Clock,
