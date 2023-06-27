@@ -5,16 +5,19 @@
 */
 
 module holasui::suifren_subdao {
+    use std::option;
+    use std::option::Option;
     use std::string;
     use std::string::String;
 
     use sui::balance::{Self, Balance};
     use sui::clock::{Self, Clock};
+    use sui::coin;
     use sui::event::emit;
     use sui::object::{Self, ID, UID};
     use sui::sui::SUI;
     use sui::table::{Self, Table};
-    use sui::transfer::share_object;
+    use sui::transfer::{public_transfer, share_object};
     use sui::tx_context::{sender, TxContext};
     use sui::url;
     use sui::url::Url;
@@ -28,15 +31,19 @@ module holasui::suifren_subdao {
     // ======== Constants =========
 
     // Vote types
-    const VOTE_ABSTAIN: u64 = 0;
-    const VOTE_FOR: u64 = 1;
-    const VOTE_AGAINST: u64 = 2;
+    const VOTE_TYPE_ABSTAIN: u64 = 0;
+    const VOTE_TYPE_FOR: u64 = 1;
+    const VOTE_TYPE_AGAINST: u64 = 2;
+
+    // Proposal types
+    const PROPOSAL_TYPE_VOTING: u64 = 0;
+    const PROPOSAL_TYPE_FUNDING: u64 = 1;
 
     // Proposal status
-    const PROPOSAL_ACTIVE: u64 = 0;
-    const PROPOSAL_CANCELED: u64 = 1;
-    const PROPOSAL_DEFEATED: u64 = 2;
-    const PROPOSAL_EXECUTED: u64 = 3;
+    const PROPOSAL_STATUS_ACTIVE: u64 = 0;
+    const PROPOSAL_STATUS_CANCELED: u64 = 1;
+    const PROPOSAL_STATUS_DEFEATED: u64 = 2;
+    const PROPOSAL_STATUS_EXECUTED: u64 = 3;
 
     // ======== Errors =========
     const EVotingNotStarted: u64 = 0;
@@ -48,6 +55,7 @@ module holasui::suifren_subdao {
     const ENotProposalCreator: u64 = 6;
     const EProposalNotActive: u64 = 7;
     const EWrongBirthLocation: u64 = 8;
+    const EWrongProposalType: u64 = 9;
 
     // ======== Types =========
     struct SUIFREN_SUBDAO has drop {}
@@ -73,7 +81,9 @@ module holasui::suifren_subdao {
         id: UID,
         name: String,
         description: String,
-        type: String,
+        type: u64,
+        recipient: Option<address>,
+        amount: Option<u64>,
         status: u64,
         creator: address,
         start_time: u64,
@@ -106,16 +116,11 @@ module holasui::suifren_subdao {
         vote: u64
     }
 
-    struct ProposalExecuted has copy, drop {
+    struct ProposalEnded has copy, drop {
         id: ID,
+        status: u64,
         name: String,
     }
-
-    struct ProposalDefeated has copy, drop {
-        id: ID,
-        name: String,
-    }
-
 
     // ======== Functions =========
 
@@ -154,29 +159,44 @@ module holasui::suifren_subdao {
     // ======== User functions =========
 
 
-    entry fun create_proposal<T: key + store>(
+    public fun create_proposal<T: key + store>(
         dao: &mut SubDao<T>,
         fren: &SuiFren<T>,
         name: String,
         description: String,
-        type: String,
+        type: u64,
+        recipient: Option<address>,
+        amount: Option<u64>,
         clock: &Clock,
         ctx: &mut TxContext
     ) {
         assert!(dao.birth_location == suifrens::birth_location(fren), EWrongBirthLocation);
 
+        assert!(type == PROPOSAL_TYPE_VOTING || type == PROPOSAL_TYPE_FUNDING, EWrongProposalType);
+
+        if (type == PROPOSAL_TYPE_FUNDING) {
+            assert!(option::is_some(&recipient), EWrongProposalType);
+            assert!(option::is_some(&amount), EWrongProposalType);
+        }
+        else if (type == PROPOSAL_TYPE_VOTING) {
+            assert!(option::is_none(&recipient), EWrongProposalType);
+            assert!(option::is_none(&amount), EWrongProposalType);
+        };
+
         let results = vec_map::empty<u64, u64>();
 
-        vec_map::insert(&mut results, VOTE_FOR, 0);
-        vec_map::insert(&mut results, VOTE_AGAINST, 0);
-        vec_map::insert(&mut results, VOTE_ABSTAIN, 0);
+        vec_map::insert(&mut results, VOTE_TYPE_FOR, 0);
+        vec_map::insert(&mut results, VOTE_TYPE_AGAINST, 0);
+        vec_map::insert(&mut results, VOTE_TYPE_ABSTAIN, 0);
 
         let proposal = Proposal {
             id: object::new(ctx),
             name,
             description,
             type,
-            status: PROPOSAL_ACTIVE,
+            recipient,
+            amount,
+            status: PROPOSAL_STATUS_ACTIVE,
             creator: sender(ctx),
             start_time: clock::timestamp_ms(clock) + dao.voting_delay,
             end_time: clock::timestamp_ms(clock) + dao.voting_delay + dao.voting_period,
@@ -204,10 +224,10 @@ module holasui::suifren_subdao {
     ) {
         let proposal = table::borrow_mut(&mut dao.proposals, proposal_id);
         assert!(proposal.creator == sender(ctx), ENotProposalCreator);
-        assert!(proposal.status == PROPOSAL_ACTIVE, EProposalNotActive);
+        assert!(proposal.status == PROPOSAL_STATUS_ACTIVE, EProposalNotActive);
         assert!(clock::timestamp_ms(clock) < proposal.start_time, EVotingStarted);
 
-        proposal.status = PROPOSAL_CANCELED;
+        proposal.status = PROPOSAL_STATUS_CANCELED;
     }
 
     entry fun vote<T: key + store>(
@@ -222,11 +242,11 @@ module holasui::suifren_subdao {
 
         let nft_id = object::id(fren);
         let proposal = table::borrow_mut(&mut dao.proposals, proposal_id);
-        assert!(proposal.status == PROPOSAL_ACTIVE, EProposalNotActive);
+        assert!(proposal.status == PROPOSAL_STATUS_ACTIVE, EProposalNotActive);
         assert!(clock::timestamp_ms(clock) >= proposal.start_time, EVotingNotStarted);
         assert!(clock::timestamp_ms(clock) <= proposal.end_time, EVotingEnded);
         assert!(!table::contains(&proposal.nft_votes, nft_id), EAlreadyVoted);
-        assert!(vote == VOTE_FOR || vote == VOTE_AGAINST || vote == VOTE_ABSTAIN, EWrongVoteType);
+        assert!(vote == VOTE_TYPE_FOR || vote == VOTE_TYPE_AGAINST || vote == VOTE_TYPE_ABSTAIN, EWrongVoteType);
         if (table::contains(&proposal.address_vote_types, sender(ctx))) {
             assert!(*table::borrow(&proposal.address_vote_types, sender(ctx)) == vote, EWrongVoteType);
         };
@@ -263,39 +283,38 @@ module holasui::suifren_subdao {
         dao: &mut SubDao<T>,
         proposal_id: ID,
         clock: &Clock,
+        ctx: &mut TxContext
     ) {
         let proposal = table::borrow_mut(&mut dao.proposals, proposal_id);
-        assert!(proposal.status == PROPOSAL_ACTIVE, EProposalNotActive);
+        assert!(proposal.status == PROPOSAL_STATUS_ACTIVE, EProposalNotActive);
         assert!(clock::timestamp_ms(clock) >= proposal.end_time, EVotingNotEnded);
 
         let results = proposal.results;
-        let votes_for = *vec_map::get(&results, &VOTE_FOR);
-        let votes_against = *vec_map::get(&results, &VOTE_AGAINST);
-        let votes_abstain = *vec_map::get(&results, &VOTE_ABSTAIN);
+        let votes_for = *vec_map::get(&results, &VOTE_TYPE_FOR);
+        let votes_against = *vec_map::get(&results, &VOTE_TYPE_AGAINST);
+        let votes_abstain = *vec_map::get(&results, &VOTE_TYPE_ABSTAIN);
         let total_votes = votes_for + votes_against + votes_abstain;
 
 
-        if (total_votes < dao.quorum) {
-            proposal.status = PROPOSAL_DEFEATED;
-            emit(ProposalDefeated {
-                id: proposal_id,
-                name: proposal.name
-            });
-        } else {
-            if (votes_for > votes_against) {
-                proposal.status = PROPOSAL_EXECUTED;
-                emit(ProposalExecuted {
-                    id: proposal_id,
-                    name: proposal.name
-                });
-            } else {
-                proposal.status = PROPOSAL_DEFEATED;
-                emit(ProposalDefeated {
-                    id: proposal_id,
-                    name: proposal.name
-                });
-            }
-        };
+        proposal.status =
+            if (total_votes < dao.quorum) PROPOSAL_STATUS_DEFEATED
+            else {
+                if (votes_for > votes_against) PROPOSAL_STATUS_EXECUTED
+                else PROPOSAL_STATUS_DEFEATED
+            };
+
+        emit(ProposalEnded {
+            id: proposal_id,
+            name: proposal.name,
+            status: proposal.status,
+        });
+
+        if (proposal.status == PROPOSAL_STATUS_EXECUTED && proposal.type == PROPOSAL_TYPE_FUNDING) {
+            let recipient = *option::borrow(&proposal.recipient);
+            let amount = *option::borrow(&proposal.amount);
+
+            public_transfer(coin::take(&mut dao.treasury, amount, ctx), recipient);
+        }
     }
 
     // ======== Utility functions =========
