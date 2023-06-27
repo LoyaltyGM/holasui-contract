@@ -24,7 +24,6 @@ module holasui::suifren_subdao {
     use sui::vec_map::{Self, VecMap};
     use suifrens::suifrens::{Self, SuiFren};
 
-    use holasui::staking::AdminCap;
     use holasui::suifren_dao;
     use holasui::suifren_dao::Dao;
 
@@ -127,8 +126,8 @@ module holasui::suifren_subdao {
     // ======== Admin functions =========
 
     entry fun create_subdao<T: key + store>(
-        _: &AdminCap,
         dao: &mut Dao<T>,
+        fren: &SuiFren<T>,
         birth_location: String,
         name: String,
         description: String,
@@ -138,6 +137,8 @@ module holasui::suifren_subdao {
         voting_period: u64,
         ctx: &mut TxContext
     ) {
+        assert!(birth_location == suifrens::birth_location(fren), EWrongBirthLocation);
+
         let subdao = SubDao<T> {
             id: object::new(ctx),
             origin_dao: object::id(dao),

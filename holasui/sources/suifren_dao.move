@@ -19,8 +19,6 @@ module holasui::suifren_dao {
     use sui::vec_map::{Self, VecMap};
     use suifrens::suifrens::SuiFren;
 
-    use holasui::staking::AdminCap;
-
     friend holasui::suifren_subdao;
     // ======== Constants =========
 
@@ -132,8 +130,8 @@ module holasui::suifren_dao {
     // ======== Admin functions =========
 
     entry fun create_dao<T: key + store>(
-        _: &AdminCap,
         hub: &mut DaoHub,
+        _: &SuiFren<T>,
         name: String,
         description: String,
         image: String,
