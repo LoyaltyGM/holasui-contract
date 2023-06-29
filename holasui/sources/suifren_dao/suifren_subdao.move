@@ -11,6 +11,7 @@ module holasui::suifren_subdao {
     use sui::balance::{Self, Balance};
     use sui::clock::{Self, Clock};
     use sui::coin;
+    use sui::coin::Coin;
     use sui::event::emit;
     use sui::object::{Self, ID, UID};
     use sui::sui::SUI;
@@ -311,6 +312,13 @@ module holasui::suifren_subdao {
 
             public_transfer(coin::take(&mut subdao.treasury, amount, ctx), recipient);
         }
+    }
+
+    entry fun deposit_to_treasury<T>(
+        dao: &mut SubDao<T>,
+        coin: Coin<SUI>,
+    ) {
+        coin::put(&mut dao.treasury, coin);
     }
 
     // ======== Utility functions =========
