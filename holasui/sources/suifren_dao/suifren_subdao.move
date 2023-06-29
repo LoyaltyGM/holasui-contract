@@ -14,6 +14,8 @@ module holasui::suifren_subdao {
     use sui::coin::Coin;
     use sui::event::emit;
     use sui::object::{Self, ID, UID};
+    use sui::object_table;
+    use sui::object_table::ObjectTable;
     use sui::sui::SUI;
     use sui::table::{Self, Table};
     use sui::transfer::{public_transfer, share_object};
@@ -70,7 +72,7 @@ module holasui::suifren_subdao {
         // duration of voting period in ms
         voting_period: u64,
         treasury: Balance<SUI>,
-        proposals: Table<ID, Proposal>,
+        proposals: ObjectTable<ID, Proposal>,
     }
 
     struct Proposal has key, store {
@@ -149,7 +151,7 @@ module holasui::suifren_subdao {
             voting_delay,
             voting_period,
             treasury: balance::zero(),
-            proposals: table::new(ctx)
+            proposals: object_table::new(ctx)
         };
 
         suifren_dao::update_subdaos(dao, object::id(&subdao));
@@ -210,7 +212,7 @@ module holasui::suifren_subdao {
             creator: proposal.creator
         });
 
-        table::add(&mut subdao.proposals, object::id(&proposal), proposal);
+        object_table::add(&mut subdao.proposals, object::id(&proposal), proposal);
     }
 
     entry fun cancel_proposal<T>(
@@ -219,7 +221,7 @@ module holasui::suifren_subdao {
         clock: &Clock,
         ctx: &mut TxContext
     ) {
-        let proposal = table::borrow_mut(&mut subdao.proposals, proposal_id);
+        let proposal = object_table::borrow_mut(&mut subdao.proposals, proposal_id);
         assert!(proposal.creator == sender(ctx), ENotProposalCreator);
         assert!(proposal.status == PROPOSAL_STATUS_ACTIVE, EProposalNotActive);
         assert!(clock::timestamp_ms(clock) < proposal.start_time, EVotingStarted);
@@ -238,7 +240,7 @@ module holasui::suifren_subdao {
         assert!(subdao.birth_location == suifrens::birth_location(fren), EWrongBirthLocation);
 
         let nft_id = object::id(fren);
-        let proposal = table::borrow_mut(&mut subdao.proposals, proposal_id);
+        let proposal = object_table::borrow_mut(&mut subdao.proposals, proposal_id);
         assert!(proposal.status == PROPOSAL_STATUS_ACTIVE, EProposalNotActive);
         assert!(clock::timestamp_ms(clock) >= proposal.start_time, EVotingNotStarted);
         assert!(clock::timestamp_ms(clock) <= proposal.end_time, EVotingEnded);
@@ -282,7 +284,7 @@ module holasui::suifren_subdao {
         clock: &Clock,
         ctx: &mut TxContext
     ) {
-        let proposal = table::borrow_mut(&mut subdao.proposals, proposal_id);
+        let proposal = object_table::borrow_mut(&mut subdao.proposals, proposal_id);
         assert!(proposal.status == PROPOSAL_STATUS_ACTIVE, EProposalNotActive);
         assert!(clock::timestamp_ms(clock) >= proposal.end_time, EVotingNotEnded);
 
