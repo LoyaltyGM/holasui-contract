@@ -5,6 +5,7 @@ module holasui::dao {
     use sui::balance::{Self, Balance};
     use sui::clock::{Self, Clock};
     use sui::coin;
+    use sui::coin::Coin;
     use sui::event::emit;
     use sui::object::{Self, ID, UID};
     use sui::sui::SUI;
@@ -122,7 +123,7 @@ module holasui::dao {
         })
     }
 
-    // ======== Admin functions =========
+    // ======== User functions =========
 
     entry fun create_dao<T: key + store>(
         hub: &mut DaoHub,
@@ -151,8 +152,6 @@ module holasui::dao {
         table_vec::push_back(&mut hub.daos, object::id(&dao));
         share_object(dao);
     }
-
-    // ======== User functions =========
 
     public fun create_proposal<T: key + store>(
         dao: &mut Dao<T>,
@@ -309,7 +308,15 @@ module holasui::dao {
         }
     }
 
+    entry fun deposit_to_treasury<T: key + store>(
+        dao: &mut Dao<T>,
+        coin: Coin<SUI>,
+    ) {
+        coin::put(&mut dao.treasury, coin);
+    }
+
     // ======== Friend functions =========
+
     public(friend) fun update_subdaos<T: key + store>(
         dao: &mut Dao<T>,
         subdao: ID,
