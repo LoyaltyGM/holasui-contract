@@ -18,6 +18,8 @@ module holasui::dao {
     use sui::url::{Self, Url};
     use sui::vec_map::{Self, VecMap};
 
+    use holasui::staking::AdminCap;
+
     // ======== Constants =========
 
     // Vote types
@@ -124,6 +126,18 @@ module holasui::dao {
             daos: table_vec::empty(ctx)
         })
     }
+
+    // ======== Admin functions =========
+
+    entry fun create_dao_hub(_: &AdminCap, ctx: &mut TxContext) {
+        let dao_hub = DaoHub {
+            id: object::new(ctx),
+            daos: table_vec::empty(ctx)
+        };
+
+        share_object(dao_hub);
+    }
+
 
     // ======== User functions =========
 
