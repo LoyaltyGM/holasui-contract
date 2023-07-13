@@ -1,7 +1,7 @@
 [package]
 name = "holasui"
 version = "0.0.1"
-published-at = "0xeebdb577b6e4505caaf2b1235a0243e3314082a634218f2192d4aaba89bcb180"
+published-at = "0x4164dcc89e0b20d9b30754596e9118381cf8ccf03155528f9f43da21c81195dd"
 
 [dependencies.Sui]
 git = "https://github.com/MystenLabs/sui.git"
@@ -15,4 +15,6 @@ local = "./../suifrens"
 [addresses]
 # v0 = 0x3412f5d7819fddb9d504a422177e3cc62c029f08002a0d51c0f7cfd93cfdfbcc
 # v1 = 0xeebdb577b6e4505caaf2b1235a0243e3314082a634218f2192d4aaba89bcb180
+# v2 = 0x5e3c893794e61cd06a37b7f2f5269ad8a1c60f0722cb1e7810be5d9d1858e664
+# v3 = 0x4164dcc89e0b20d9b30754596e9118381cf8ccf03155528f9f43da21c81195dd
 holasui = "0x0"
