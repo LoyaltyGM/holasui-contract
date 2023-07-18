@@ -13,5 +13,4 @@ HolaSui is a platform for builders that allows the creation of gamification expe
 - **Suifren DAO and Suifren SubDao Modules**: These modules are specialized implementations of a DAO contract for the SuiFren NFT. Additionally, they introduce the SubDao feature, which enables the creation of SubDaos based on the birth_location attribute of the Suifren NFT. SubDaos are integral parts of the main DAO, providing enhanced organizational structures.
 
 ## License
-MIT License
-Copyright (c) 2023 Hola Sui
+MIT License. Copyright (c) 2023 Hola Sui
