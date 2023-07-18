@@ -4,7 +4,7 @@
 
 HolaSui is a platform for builders that allows the creation of gamification experiences on the Sui blockchain using our tools and services, thereby boosting community interest and engagement.
 
-## Contents
+## Modules
 
 - **Staking Module**: Admins can create staking pools for NFTs, and stakers are rewarded with points for their stakes. Stakers can spend points to claim rewards. The admin also has the ability to add rewards to the staking pools.
 
