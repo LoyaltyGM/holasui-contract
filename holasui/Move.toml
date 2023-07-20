@@ -6,8 +6,8 @@ published-at = "0x4164dcc89e0b20d9b30754596e9118381cf8ccf03155528f9f43da21c81195
 [dependencies.Sui]
 git = "https://github.com/MystenLabs/sui.git"
 subdir = "crates/sui-framework/packages/sui-framework"
-# mainnet-1.4.2
-rev = "d9bcbb29d8879cead0fd62e76e29441af0c7469e"
+# mainnet-1.5.0
+rev = "cc4ad6d8a3f05ad8641e977fad228e09a77453b8"
 
 [dependencies.suifrens]
 local = "./../suifrens"
