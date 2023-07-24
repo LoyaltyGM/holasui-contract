@@ -8,6 +8,8 @@ git = "https://github.com/MystenLabs/sui.git"
 subdir = "crates/sui-framework/packages/sui-framework"
 # mainnet-1.5.0
 rev = "cc4ad6d8a3f05ad8641e977fad228e09a77453b8"
+## testnet-1.5.0
+#rev = "e7c5810936caf15916ed8e3bb893f96ac8273937"
 
 [dependencies.suifrens]
 local = "./../suifrens"
